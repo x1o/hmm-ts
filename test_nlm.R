@@ -1,0 +1,6 @@
+f <- function(x, a) sum((x-a)^2)
+xs <- seq(-6, 6, 0.1)
+a <- c(2, 3)
+zs <- outer(xs, xs, FUN = function(x, y) apply(rbind(x, y), 2, function(z) f(z, a)))
+contour(xs, xs, zs)
+print(nlm(f, c(10, 10), a=a))

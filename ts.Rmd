@@ -1,0 +1,287 @@
+---
+title: "TS"
+author: "Dmitry Zotikov"
+date: "March 19, 2017"
+output: html_document
+---
+
+Earthquakes-count series.
+
+ * Not periodic (`stl`, `decompose`) give an error.
+ * SMA Smoothing shows there are two periods starting from year 1925 (but the two above functions still fail to identify any)
+ * 0 ACF Forecasting:
+   * Holt-Winters (simple) exponential smoothing
+   * H-W ES on smoothed data
+   * Confirmation with residual analysis and Box-Ljung (independence) test
+ * Non-stationary -> Stationary TS by differences (1-st order)
+   * Confirmation with `kpss.test` (level/trend stationarity)
+ * ARIMA(0, 1, 1) forecasting
+
+## Comparison
+
+```{r}
+fc.hw.s <- forecast(HoltWinters(tt, beta=FALSE, gamma=FALSE))
+fc.hw <- forecast(HoltWinters(tt, gamma=FALSE))
+fc.arima.011 <- forecast(arima(tt, order=c(0, 1, 1)))
+hmm.eq <- PoisHmm(3, tt)
+hmm.eq$fit(tt)
+fc.hmm <- hmm.eq$forecast(tt, seq(min(tt), max(tt)), 10)
+par(mfrow=c(1,3))
+plot(fc.hw)
+plot(fc.hw.s)
+plot(fc.arima.011)
+par(mfrow=c(1,1))
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+https://a-little-book-of-r-for-time-series.readthedocs.io/en/latest/src/timeseries.html
+
+```{r}
+source('import_earthquakes.R')
+source('pois_hmm.R')
+source('norm_hmm.R')
+```
+
+## ACF, tt object
+
+```{r}
+xx <- earthquakes.usgs.annual$count
+plot(xx, type='b')
+acf(xx)
+
+xx.c <- xx - mean(xx)
+acf(xx.c)
+plot(xx.c, type='b')
+
+tt <- ts(xx, start=earthquakes.usgs.annual$year[1])
+plot(tt)
+```
+
+const noise & const amplitude => additive model
+if not -- apply log
+
+## Decomposition
+
+### SMA Smoothing
+
+```{r, fig.height=10, fig.width=9}
+library('TTR')
+
+par(mfrow=c(4,4))
+for (n in 1:16) {
+  plot(SMA(tt, n), main=n)
+}
+for (n in 1:16) {
+  plot(SMA(log(tt), n), main=n)
+}
+par(mfrow=c(1,1))
+```
+
+### MA Decomposition
+
+```{r}
+plot(log(tt))
+```
+
+```{r, fig.height=10, fig.width=9}
+# plot(decompose(tt)) ## nope
+# plot(decompose(tt), 'multiplicative') ## nope
+# stl(tt, 'periodic') ## nope
+```
+
+Periods starting from year 1924.
+
+```{r}
+plot(SMA(tt, 10), main=10)
+points(SMA(tt, 10))
+# identify(earthquakes.usgs.annual$year, earthquakes.usgs.annual$count)
+```
+
+Still no.
+
+```{r}
+tt.per.smoothed <- na.omit(SMA(ts(tt[(25-10):length(tt)]), 10))
+plot(tt.per.smoothed)
+# plot(decompose(tt.per.smoothed ))  # nope
+```
+
+
+## Forecasting
+
+Exponential smoothing methods make no assumptions about the correlations between successive values of the time series.
+
+### Simple Exponential Smoothing (Holt-Winters)
+
+```{r}
+tt.hw.s <- HoltWinters(tt, beta=FALSE, gamma=FALSE)
+plot(tt.hw.s)
+summary(tt.hw.s)
+str(tt.hw.s)
+```
+
+Equivalent for this TS:
+
+```{r}
+library('forecast')
+tt.ets <- ets(tt)  # A/N/N (error/trend/season)
+```
+
+```{r}
+plot(forecast(tt.hw.s))
+plot(forecast(tt.ets))
+```
+
+### Not So Simple
+
+ * $\alpha$ --- estimate of the level at the current time point;
+ * $\beta$ --- estimate of the slope b of the trend component at the current time point.
+
+Values that are close to 0 mean that little weight is placed on the most recent observations when making forecasts of future values.
+
+```{r}
+tt.hw <- HoltWinters(tt, gamma=FALSE)
+plot(forecast(tt.hw))
+```
+
+### Smoothed
+
+```{r}
+plot(forecast(HoltWinters(na.omit(SMA(tt, 10)), beta=FALSE, gamma=FALSE)))
+```
+
+### Residual analysis
+
+The model cannot be improved upon if there's:
+
+ * no correlations between residuals
+ * residuals ~ $\mathrm{N}(0, \sigma^2)$
+ * Box-Ljung doesn't reject H0: indep
+
+```{r}
+rr.s <- na.omit(forecast(tt.hw.s)$residuals)
+rr <- na.omit(forecast(tt.hw)$residuals)
+acf(rr.s)
+acf(rr)
+```
+
+
+```{r}
+for (resid in list(rr, rr.s)) {
+  hist(resid, freq=FALSE)
+  phi <- function(x) dnorm(x, 0, sd(resid))
+  curve(phi, from=min(resid), to=max(resid), col='red', add=TRUE)
+  qqnorm(resid)
+  qqline(resid)
+  print(shapiro.test(resid))
+  print(Box.test(resid, lag=15, type='Ljung-Box'))
+}
+```
+
+
+
+## WWWusage 
+
+```{r}
+plot(WWWusage)
+```
+
+### SMA Forecast
+
+```{r}
+plot(forecast(WWWusage))
+```
+
+### HMM
+
+```{r}
+# selectModelIc(PoisHmm, WWWusage, 10, TRUE)  # (3, 5)
+hmm.www <- PoisHmm(5, WWWusage)
+hmm.www$fit(WWWusage)
+library('corrplot')
+```
+
+```{r}
+color.bar <- function(lut, min, max=-min, nticks=11, ticks=seq(min, max, len=nticks), title='') {
+  scale = (length(lut)-1)/(max-min)
+  
+  # dev.new(width=1.75, height=5)
+  plot(c(0,10), c(min,max), type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', main=title)
+  axis(2, ticks, las=1)
+  for (i in 1:(length(lut)-1)) {
+    y = (i-1)/scale + min
+    rect(0,y,10,y+1/scale, col=lut[i], border=NA)
+  }
+}
+col2 <- colorRampPalette(c("#67001F", "#B2182B", "#D6604D", "#F4A582", "#FDDBC7",
+                           "#FFFFFF", "#D1E5F0", "#92C5DE", "#4393C3", "#2166AC", "#053061"))
+```
+
+```{r}
+corrplot(hmm.www$A, method='circle', is.corr=FALSE, addCoef.col = 'black',
+         col=col2(100)[30:100])
+```
+
+```{r, fig.height=10, fig.width=9}
+www.probes <- seq(min(WWWusage), max(WWWusage), by=3)
+www.probes <- seq(150, 350, by=4)
+www.fc <- hmm.www$forecast(WWWusage, www.probes, 16)
+hmm.www$plotForecast(www.fc, WWWusage, www.probes, 1:16)
+```
+
+## ARIMA
+
+Defined for stationary series.
+
+### Differences
+
+Not stationary in mean (use HMM algos to detect component means?)
+
+```{r}
+par(mfrow=c(2,2))
+plot(tt)
+for (n in 1:3) {
+  plot(diff(tt, differences=n))
+}
+par(mfrow=c(1,1))
+```
+
+```{r}
+tt.diff <- diff(tt, differences=1)
+acf(tt.diff)
+```
+
+Box-Ljung rejected => non-independent?
+
+```{r}
+print(Box.test(tt.diff, lag=15, type='Ljung'))
+```
+
+H0: level/trend stationary
+
+```{r}
+library('tseries')
+# adf.test(tt.diff, alternative='stationary')
+print(kpss.test(tt))
+print(kpss.test(tt.diff))
+```
+
+### Selecting ARIMA model
+
+`which(abs(acf(tt.diff, plot=FALSE)$acf))` = 1, 2 so ARMA(0, 1) for `tt.diff` and
+ARIMA(0, 1, 1) for tt:
+
+```{r}
+print(auto.arima(tt))
+```
+
+### Forecasting
+
+```{r}
+plot(forecast(arima(tt, order=c(0, 1, 1))))
+```
+
++ residual analysis
