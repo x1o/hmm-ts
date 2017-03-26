@@ -1,0 +1,87 @@
+---
+title: "ts-model"
+author: "Dmitry Zotikov"
+date: "March 26, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+$1+0.5t + \sin t + \epsilon, \quad \epsilon \sim \mathrm{U}(-2,2), t\in [0, 4\pi ]$
+
+```{r, fig.height=8, fig.width=7}
+T <- 100
+tt <- seq(0, 4*pi, length.out=T)
+par(mfrow=c(3, 1))
+xx <- 1 + 0.5*tt
+plot(xx, type='l')
+xx <- xx + sin(2*tt)
+plot(xx, type='l')
+xx <- xx + runif(100, -2, 2)
+xx <- ts(xx)
+plot(xx)
+par(mfrow=c(1,1))
+```
+
+```{r}
+acf(xx, T)
+```
+
+
+```{r, fig.height=10, fig.width=9}
+library('TTR')
+
+par(mfrow=c(4,4))
+for (n in 1:16) {
+  plot(SMA(xx, n), main=n)
+}
+for (n in 1:16) {
+  plot(SMA(log(xx+1), n), main=n)
+}
+par(mfrow=c(1,1))
+```
+
+```{r}
+# plot(decompose(xx)) ## nope
+# plot(decompose(xx), 'multiplicative') ## nope
+# stl(xx, 'periodic') ## nope
+```
+
+```{r}
+library('forecast')
+xx.hw.s <- HoltWinters(xx, beta=FALSE, gamma=FALSE)
+plot(xx.hw.s)
+summary(xx.hw.s)
+plot(forecast(xx.hw.s))
+```
+
+```{r}
+xx.hw <- HoltWinters(xx, gamma=FALSE)
+plot(forecast(xx.hw))
+```
+
+```{r}
+rr.s <- na.omit(forecast(xx.hw.s)$residuals)
+rr <- na.omit(forecast(xx.hw)$residuals)
+acf(rr.s)
+acf(rr)
+```
+
+```{r}
+for (resid in list(rr, rr.s)) {
+  hist(resid, freq=FALSE)
+  phi <- function(x) dnorm(x, 0, sd(resid))
+  curve(phi, from=min(resid), to=max(resid), col='red', add=TRUE)
+  qqnorm(resid)
+  qqline(resid)
+  print(shapiro.test(resid))
+  print(Box.test(resid, lag=15, type='Ljung-Box'))
+}
+```
+
+```{r}
+print(auto.arima(xx))
+plot(forecast(arima(xx, order=c(0, 1, 2))))
+```

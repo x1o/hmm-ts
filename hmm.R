@@ -185,58 +185,36 @@ Hmm <- setRefClass("Hmm",
         li <- numeric(h.max)
         # FIXME: rewrite loop
         for (h in 1:h.max) {
-          print(h)
+          # print(h)
           pivot <- fc.idcs[h]
           accum <- F[h, pivot]
           ui[h] <- pivot
           li[h] <- pivot
           #FIXME: broken logic: check before adding
           while ((li[h] > 1) || (ui[h] < length(F[h,]))) {
-            if (li[h] > 1)  {
+            if (li[h] > 2)  {
               if ((F[h, li[h] - 1] + accum) > conf.level) {
                 break
               }
               li[h] <- li[h] - 1
               accum <- accum + F[h, li[h]]
             }
-            if (ui[h] < length(F[h,])) {
+            if (ui[h] < length(F[h,])-1) {
               if ((F[1, ui[h] + 1] + accum) > conf.level) {
                 break
               }
               ui[h] <- ui[h] + 1
               accum <- accum + F[h, ui[h]]
             }
-            print(c(li[h], ui[h], accum))
+            # print(c(li[h], ui[h], accum))
           }
-          print(paste('lower', h, conf.level, '<-', x.probes[li[h]]))
-          print(paste('upper', h, conf.level, '<-', x.probes[ui[h]]))
+          # print(paste('lower', h, conf.level, '<-', x.probes[li[h]]))
+          # print(paste('upper', h, conf.level, '<-', x.probes[ui[h]]))
           fc$lower[h, lvl.idx] <- x.probes[li[h]]
           fc$upper[h, lvl.idx] <- x.probes[ui[h]]
         }
       }
       return(fc)
-    },
-    plotForecastDist = function(F, xx, x.probes, h.plot=c()) {
-      plot.idcs <- 1:nrow(F)
-      if (length(h.plot) != 0) {
-        plot.idcs <- h.plot
-      }
-      n.plots <- length(plot.idcs)
-      par(mfrow=c(floor(sqrt(n.plots)), ceiling(n.plots/floor(sqrt(n.plots)))))
-      for (h in plot.idcs) {
-        plot(x.probes, F[h,], type="h", main='',
-             xlab='Observations', ylab='Probabilities',
-             xlim=range(xx), ylim=c(0, max(F)))
-        title(paste("h =", h), line = 2)
-        par(new=TRUE)
-        argmax = which.max(F[h,])
-        plot(x.probes[argmax], F[h, argmax], type="h", lwd=3, axes=FALSE,
-             xlab='', ylab='',
-             xlim=range(xx), ylim=c(0, max(F)))
-        axis(3, at=round(x.probes[argmax], 2))
-        cat('h = ', h, ': F[', argmax, '] = ', F[h, argmax], '\n', sep='')
-      }
-      par(mfrow=c(1,1))
     },
     aic = function(xx) {
       -2 * logL(xx) + 2*getDf()
