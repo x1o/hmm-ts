@@ -66,11 +66,66 @@ Hmm <- setRefClass("Hmm",
       setWrkParams(par.wrk)
       -logL(xx)
     },
-    fit = function(xx, iterlim=1000, ...) {
-      nlm.out <- nlm(function(...) mLogL(...), getWrkParams(), xx, iterlim=iterlim, ...)
-      setWrkParams(nlm.out$estimate)
-      n.iter <<- nlm.out$iterations
-      return(nlm.out)
+    fit = function(xx, iterlim=1000, method='nlm', ...) {
+      if (method == 'nlm') {
+        nlm.out <- nlm(.self$mLogL, getWrkParams(), xx, iterlim=iterlim, ...)
+        setWrkParams(nlm.out$estimate)
+        n.iter <<- nlm.out$iterations
+        return(nlm.out)
+      } else {
+        # browser()
+        # TODO: upgrade to 3.2.3 to fix the error
+        # TODO: try different methods and optimizers
+        # TODO: control
+        # TODO: proper parnames (for confints)
+        # TODO: remove n.iter?
+        # TODO: process error codes
+        ### HACK
+        par.init <- getWrkParams()
+        n.par <- length(par.init)
+        parnames(mLogL) <- as.character(1:n.par)
+        names(par.init) <- as.character(1:n.par)
+        ### /HACK
+        nlm.out <- mle2(mLogL,
+                        start=par.init,
+                        data=list(xx=xx),
+                        control=list(maxit=iterlim)) # iterlim!
+        # nlm.out <- mle2(.self$mLogL,
+        #                 vecpar=TRUE,
+        #                 start=list(par.wrk=getWrkParams()),
+        #                 data=list(xx=xx),
+        #                 optimizer='nlm',
+        #                 iterlim=iterlim)
+        browse()
+        # r <- profile(nlm.out) # can take up to 30 minutes
+        # confint(r)
+        #     2.5 %     97.5 %
+        # 1   2.471940  2.6729458
+        # 2   2.700080  3.3890329
+        # 3   2.767046  3.7076717
+        # 4   3.280958  3.5433704
+        # 5  -5.778032  6.4607278
+        # 6         NA         NA
+        # 7         NA         NA
+        # 8         NA         NA
+        # 9  -6.803150         NA
+        # 10        NA         NA
+        # 11        NA -1.6854847
+        # 12        NA         NA
+        # 13 -6.676508 -0.2812028
+        # 14        NA -1.7843541
+        # 15 -5.255174 14.4263307
+        # 16        NA         NA
+        # 17        NA         NA
+        # 18        NA         NA
+        # 19        NA         NA
+        # TODO: what do NA's mean?
+        # ci <- confint(r)
+        # plot(r, which=rownames(na.exclude(ci)))
+        # setWrkParams(nlm.out$estimate)
+        # n.iter <<- nlm.out$iterations
+        # return(nlm.out)
+      }
     },
     genSample = function(T) {
       components <- 1:getM()

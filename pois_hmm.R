@@ -14,8 +14,10 @@ PoisHmm <- setRefClass("PoisHmm",
       rng <<- rpois
     },
     getWrkParams = function() {
-      c(log(pdf.params$lambda),
-        callSuper())
+      as.numeric(
+        c(log(pdf.params$lambda),
+          callSuper())
+      )
     },
     setWrkParams = function(params) {
       # lambda, A (by columns excluding diag), priors : m + m(m-1) + (m-1)

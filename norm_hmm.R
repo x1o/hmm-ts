@@ -15,9 +15,11 @@ NormHmm <- setRefClass("NormHmm",
       rng <<- rnorm
     },
     getWrkParams = function() {
-      c(pdf.params$mean,
-        log(pdf.params$sd),
-        callSuper())
+      as.numeric(
+        c(pdf.params$mean,
+          log(pdf.params$sd),
+          callSuper())
+      )
     },
     setWrkParams = function(params) {
       # mean, sd, A (by columns excluding diag), priors : m + m + m(m-1) + (m-1)
