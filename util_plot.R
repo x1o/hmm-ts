@@ -56,12 +56,28 @@ plotForecastDist <- function(fc.dist, xx, x.probes, h.plot=c()) {
   par(mfrow=c(1,1))
 }
 
-plotA <- function(hmm) {
+plotParams <- function(pp) {
   library('corrplot')
+  if (!is.matrix(pp)) {
+    pp <- matrix(pp,  1, length(pp))
+  }
   col2 <- colorRampPalette(c("#67001F", "#B2182B", "#D6604D", "#F4A582",
                              "#FDDBC7", "#FFFFFF", "#D1E5F0", "#92C5DE",
                              "#4393C3", "#2166AC", "#053061"))
-  corrplot(hmm$A,
+  corrplot(pp,
            method='circle', is.corr=FALSE, addCoef.col = 'black',
            col=col2(100)[30:100])
+}
+
+plotModel <- function(hmm) {
+  # FIXME: relative width
+  # def.par <- par(no.readonly = TRUE)
+  # layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+  # plotParams(hmm$A)
+  # plotParams(hmm$priors)
+  # plotParams(hmm$pdf.params[[1]])
+  # for (k in 1:length(hmm$pdf.params)) {
+  #
+  # }
+  # par(def.par)
 }

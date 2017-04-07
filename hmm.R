@@ -8,10 +8,31 @@ Hmm <- setRefClass("Hmm",
     n.iter = "numeric"
   ),
   methods = list(
-    initialize = function(m, xx) {
+    init.from.data = function(m, xx) {
       A <<- diag(1 - (m - 1) * 0.05, m, m)
       A[!A] <<- 0.05
       priors <<- rep(1, m) / m
+    },
+    init.from.params = function(A, priors) {
+      A <<- A
+      priors <<- priors
+    },
+    initialize = function(m, xx, A, priors) {
+      if (missing(A) && missing(priors)) {
+        init.from.data(m, xx)
+      } else if (missing(m) && missing(xx)) {
+        init.from.params(A, priors)
+      } else {
+        stop("Either m, xx or A, priors should be given as arguments.")
+      }
+    },
+    show = function() {
+      cat("A:\n")
+      methods::show(round(A, 2))
+      cat("\npriors:\n")
+      methods::show(round(priors, 2))
+      cat("\npdf.params:\n")
+      methods::show(lapply(pdf.params, function(x) round(x, 2)))
     },
     getM = function() {
       nrow(A)
@@ -30,11 +51,11 @@ Hmm <- setRefClass("Hmm",
       # TODO: stationary case
       m <- getM()
       A <<- diag(m)
-      A[!A] <<-  exp(params[(A.offset*m + 1):((A.offset*m + 1) + m * (m - 1) - 1)])
+      A[!A] <<-  exp(params[(A.offset + 1):((A.offset + 1) + m * (m - 1) - 1)])
       A <<- A / rowSums(A)
       priors <<- 1
       if (m > 1) {
-        priors <<- c(priors, exp(params[(A.offset*m + m * (m - 1) + 1):length(params)]))
+        priors <<- c(priors, exp(params[(A.offset + m * (m - 1) + 1):length(params)]))
       }
       priors <<- priors / sum(priors)
     },
@@ -127,13 +148,17 @@ Hmm <- setRefClass("Hmm",
         # return(nlm.out)
       }
     },
-    genSample = function(T) {
+    walkChain = function(T) {
       components <- 1:getM()
       state <- numeric(T)
       state[1] <- sample(components, 1, prob=priors)
       for (t in 2:T) {
         state[t] <- sample(components, 1, prob=A[state[t-1],])
       }
+      return(state)
+    },
+    genSample = function(T) {
+      state <- walkChain(T)
       do.call(rng, c(T, rapply(pdf.params,
                                function(params) params[state],
                                how='list')))

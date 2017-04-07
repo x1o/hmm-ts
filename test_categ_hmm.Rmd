@@ -1,0 +1,93 @@
+---
+title: "Categorial HMM Test"
+author: "Dmitry Zotikov"
+date: "April 2, 2017"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source('categ_hmm.R')
+set.seed(1)
+```
+
+## Initialization, setting / getting working parameters
+
+Категориальная СММ работает над последовательностями из конечного алфавита, которые переводятся в последовательнести индексов символов в этом алфавите.
+
+Параметры компонент смеси задаются как матрица, каждая строчка которая есть соответствующее дискретное распределение с конечным носителем.
+
+### Init from data
+
+Инициализация по данным происходит как и других СММ; параметры компонент смеси инициализируются равномерно.  Здесь данные --- первые 120 символов генома E.coli, число компонент равно 2:
+
+```{r}
+m <- 2
+Q <- c('A', 'C', 'G', 'T')
+xx <- 'GTAAGTATTTTTCAGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGCTTCTGAACTGGTTACCTGCCGTGAGTAAATTAAAATT'
+xx <- str.to.idcs(xx, Q)
+xx
+hmm <- CategHmm(m, xx)
+hmm
+```
+
+### Manual init
+
+Ручное задание начальных параметров, проверка правильности перевода в рабочие параметры и обратно:
+
+```{r}
+A <- matrix(1/m, m, m) + runif(m^2)
+A <- A / rowSums(A)
+priors <- rep(1/m, m) + runif(m)
+priors <- priors / sum(priors)
+
+k <- 4
+# pdf.params <- list(prob=matrix(1/k, m, k, byrow=TRUE))
+pdf.params <- list(prob=matrix(c(
+  0.2, 0.3, 0.4, 0.1,
+  0.1, 0.6, 0.1, 0.2
+), m, k, byrow=TRUE))
+hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params)
+hmm
+hmm$getWrkParams()
+p.w <- hmm$getWrkParams()
+hmm$setWrkParams(p.w)
+hmm
+```
+
+## Fitting
+
+Обучение модели:
+
+```{r}
+hmm$fit(xx)
+hmm
+```
+
+### Special case when m = 1
+
+Интересно, что в специальном случае одной компоненты, модель корректно оценивает параметры как гистограмму выборки:
+
+```{r}
+hmm <- CategHmm(1, xx)
+hmm$fit(xx)
+hmm
+h <- hist(xx, breaks=0:4, plot=FALSE)
+h$density
+plot(h, freq=FALSE)
+```
+
+## Sampling
+
+Моделирование:
+
+```{r}
+idcs <- hmm$genSample(10)
+idcs
+idcs.to.str(idcs, Q)
+```

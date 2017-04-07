@@ -1,0 +1,579 @@
+---
+title: "Estimator consistency"
+author: "Dmitry Zotikov"
+date: "March 31, 2017"
+output:
+  html_document:
+    md_extensions: +latex_macros
+    toc: yes
+---
+
+\newcommand{\A}{\mathbf{A}}
+\newcommand{\u}{\mathbf{u}}
+\newcommand{\l}{\boldsymbol{\lambda}}
+\newcommand{\m}{\boldsymbol{\mu}}
+\newcommand{\s}{\boldsymbol{\sigma}}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+source('util_plot.R')
+plot.data.summary <- function(xx) {
+  par(mfrow=c(2,2))
+  plot(xx, type='o', pch=20)
+  hist(xx)
+  acf(xx, length(xx))
+  par(mfrow=c(1,1))
+}
+```
+
+# Моделирование Poisson
+
+Моделирование с последующей оценкой параметров модели с марковским выбором одного из пуассоновских распределений.
+
+Моделирование: 1) моделируете начальное состояние - пуассоновское распределение - с помощью некоторого фиксированного вектора вероятностей начальных состояний; 2) моделируете случайную величину из выбранного пуассоновского распределения; 3) с помощью матрицы переходных вероятностей моделируете следующее состояние и возвращаетесь к пункту 2.
+
+Оценка параметров: применение Ваших программных средств.
+
+Попробуйте начать следует со специальных случаев. Например,  для пуассоновской модели возьмите матрицу, которая всегда выбирает первое распределение, т.е. (1 0//1 0). Сможет ли тогда Ваш инструмент распознать эту ситуацию и правильно оценить только параметр пуассоновского распределения?
+
+```{r}
+source('pois_hmm.R')
+```
+
+
+## Вырожденный случай
+
+Моделируем данные из $$\A=\begin{pmatrix}1 & 0\\
+1 & 0
+\end{pmatrix},\quad\u=\begin{pmatrix}1\\
+0
+\end{pmatrix},\quad\l=\begin{pmatrix}6\\
+1
+\end{pmatrix}.$$
+
+### Моделирование
+
+```{r, fig.height=9, fig.width=9}
+set.seed(13)
+m <- 2
+A <- matrix(c(1, 0,
+              1, 0), 2, 2, byrow=TRUE)
+priors <- c(1, 0)
+pdf.params <- list(lambda = c(6, 1))
+hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+T <- 100
+xx <- hmm$genSample(T)
+plot.data.summary(xx)
+```
+
+### Оценка параметров
+
+Оценим параметры по смоделированным данным.
+
+Информационные критерии справедливо предалагют выбрать модель с одной компонентой:
+
+```{r}
+source('modsel.R')
+selectModelIc(PoisHmm, xx, 4, TRUE)
+```
+
+#### Uniform initialization
+
+Известно, что СММ плохо обучаются, если все начальные параметры распределены равномерно:
+
+```{r, warning=FALSE}
+set.seed(13)
+A <- matrix(1/m, m, m)
+priors <- rep(1/m, m)
+pdf.params = list(lambda = c(1,1))
+hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+Видно, что прошло всего 8 итераций прежде чем оптимизатор застрял в локальном минимуме. $\A$ и $\u$ не изменились. Однако параметры $\l$ оказались близко к оптимальным (нас интересует только первый элемент).
+
+#### Uniform + noise
+
+Инициализируем модель с небольшим зашумлением относительно равномерного распределения:
+
+```{r, warning=FALSE}
+set.seed(13)
+A <- matrix(1/m, m, m) + runif(m^2)
+A <- A / rowSums(A)
+priors <- rep(1/m, m) + runif(m)
+priors <- priors / sum(priors)
+pdf.params = list(lambda = c(1,1))
+hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+Видно, что после 38 итераций модель оказалась в локальном минимуме с параметрами, довольно близкими к оптимальным.
+
+### Моделирование и оценка нескольких выборок подряд
+
+Оценки получаются, тем не менее, хорошими НЕ ВСЕГДА.  Несколько раз проделаем следующее:
+
+ * Смоделируем выборку моделью с известными параметрами (`hmm.ref`)
+ * Оценим параметры по выборке с нужной инициализацией (равномерной и зашумленной)
+ * Посмотрим на меры различия моделей:
+    * `|A.ref-A.est|`: фробениусова норма разницы матриц $\A$: $$\left\Vert \A\right\Vert _{F}=\sqrt{\sum_{i,j=1}^{m}a_{ij}^{2}}$$
+    * `dist(hmm, hmm.ref)`: поскольку оценивание происходит с точностью до порядка состояний, "хорошими" являются матрицы с минимальной (0) и, одновренменно, максимальной ($\sqrt{2m}$) фробениусовой нормой разности.  Тогда определим дистацию между матрицами как $$\rho(\A_{\mathrm{ref}},\A_{\mathrm{est}})=1-\left|\left\Vert \A_{\mathrm{ref}}-\A_{\mathrm{est}}\right\Vert _{F}-\frac{\sqrt{2m}}{2}\right|.$$ Тогда наиболее близкими будут матрицы с расстоянием 0, далекими --- 1.
+    * `MMLK.ref`: minimum log likelihood `hmm.ref` на выборке, этой же моделью и сгенерированной.
+    * `MMLK`: minimum log likelihood модели с оцененными параметрами.
+    * `diff(MLLK)`: разница последних двух.
+
+```{r}
+norm.frob <- function(A) {
+  sqrt(sum(A^2))
+}
+
+dist.hmm <- function(hmm.1, hmm.2) {
+  m <- hmm.1$getM()
+  if (m != hmm.2$getM()) {
+    stop('HMMs of unequal number of components')
+  }
+  return(1-abs(norm.frob(hmm.1$A - hmm.2$A) - sqrt(2*m)/2))
+}
+
+test.hmm.consist <- function(hmm.ref, T, N, init='unif+noise') {
+  results <- matrix(0, N, 5, byrow=TRUE)
+  colnames(results) <- c('|A.ref-A.est|', 'dist(hmm, hmm.ref)',
+                         'MLLK.ref', 'MLLK', 'diff(MLLK)')
+  hmms <- list()
+  HmmClass.name <- class(hmm.ref)[1]
+  HmmClass <- eval(parse(text=HmmClass.name))
+  m <- hmm.ref$getM()
+  for (j in 1:N) {
+    xx <- hmm.ref$genSample(T)
+    A <- matrix(1/m, m, m)
+    priors <- rep(1/m, m)
+    if (HmmClass.name == 'PoisHmm') {
+      pdf.params = list(lambda=c(1, 1))
+    } else if (HmmClass.name == 'NormHmm') {
+      pdf.params = list(mean=c(0, 0), sd=c(1, 1))
+    } else if (HmmClass.name == 'CategHmm') {
+      k <- hmm.ref$getK()
+      prob <- matrix(1/k, m, k, byrow=TRUE)
+      if (init == 'unif+noise') {
+        prob <- prob + runif(m*k)
+        prob <- prob / rowSums(prob)
+      }
+      pdf.params <- list(prob=prob)
+    } else {
+      stop('Unknown HmmClass')
+    }
+    if (init == 'unif+noise') {
+        A <- A + runif(m^2)
+        A <- A / rowSums(A)
+        priors <- priors + runif(m)
+        priors <- priors / sum(priors)
+    }
+    hmm <- HmmClass(A=A, priors=priors, pdf.params=pdf.params)
+    par.opt <- hmm$fit(xx)
+    print(par.opt$iterations)
+    results[j, 1] <- norm.frob(hmm.ref$A - hmm$A)
+    results[j, 2] <- dist.hmm(hmm.ref, hmm)
+    results[j, 3] <- -hmm.ref$logL(xx)
+    results[j, 4] <- par.opt$minimum
+    results[j, 5] <- abs(results[j, 4] - results[j, 3])
+    hmms[j] <- hmm
+  }
+  return(list(results, hmms))
+}
+```
+
+```{r}
+A.ref <- matrix(c(1, 0,
+                  1, 0), 2, 2, byrow=TRUE)
+priors.ref <- c(1, 0)
+pdf.params.ref <- list(lambda = c(6, 1))
+hmm.ref <- PoisHmm(A=A.ref, priors=priors.ref, pdf.params=pdf.params.ref)
+N <- 10
+```
+
+#### Uniform init; T = 100
+
+Сделаем 10 повторов на выборке объема 100.
+
+На равномерной инициализации за 8 итераций оптимизируются лишь параметры компнентов смеси.  Матрицы получаются максимально далекими несмотря на то, что разица `MLLK` близка к нулю
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 100
+res <- test.hmm.consist(hmm.ref, T, N, 'unif')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+Можно выборочно посмотреть на 1 и 4 модели:
+
+```{r}
+hmms[[1]]
+hmms[[4]]
+```
+
+#### Uniform + noise; T = 100
+
+Результаты зашумленной инициализации в некотором смысле лучше:
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 100
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+**Важно**: Нужно обратить внимание, что большая разница `MLLK` не всегда соответствует большому расстоянию между матрицами (модель 9).  Наоборот, большое расстояние между матрицами может быть вместе с маленькой разницей `MLLK` (модель 7).
+
+```{r}
+hmms[[9]]
+hmms[[7]]
+```
+
+Поэтому требуется ввести правильную меру близости модели, учитывающую еще и вектор априорных вероятностей и параметры компонент, могущих не иметь смысл вероятности.
+
+#### Uniform; T = 1000
+
+Аналогичные эксперименты для выборки объема 1000:
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+#### Uniform + noise; T = 1000
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+## Общий случай 
+
+Рассмотрим
+$$\A=\begin{pmatrix}0.3 & 0.7\\
+0.8 & 0.2
+\end{pmatrix},\quad\u=\begin{pmatrix}0.4\\
+0.6
+\end{pmatrix},\quad\l=\begin{pmatrix}7\\
+10
+\end{pmatrix}.
+$$
+
+```{r, fig.height=9, fig.width=9}
+set.seed(13)
+A.ref <- matrix(c(0.3, 0.7,
+                  0.8, 0.2), 2, 2, byrow=TRUE)
+priors.ref <- c(0.4, 0.6)
+pdf.params.ref <- list(lambda = c(7, 10))
+hmm.ref <- PoisHmm(A=A.ref, priors=priors.ref, pdf.params=pdf.params.ref)
+N <- 10
+```
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 900
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+hmms[[1]]
+hmms[[2]]
+```
+
+# Моделирование нормального распределения
+
+Моделирование с последующей оценкой параметров модели с марковским выбором одного из нормальных распределений.
+
+```{r}
+source('norm_hmm.R')
+```
+
+Сделаем всё аналогично для нормального распределения.
+
+## Вырожденный случай
+
+### Моделирование
+
+Моделируем данные из $$\A=\begin{pmatrix}1 & 0\\
+1 & 0
+\end{pmatrix},\quad\u=\begin{pmatrix}1\\
+0
+\end{pmatrix},\quad\m=\begin{pmatrix}3\\
+4
+\end{pmatrix},\quad\s=\begin{pmatrix}2\\
+5
+\end{pmatrix}$$
+
+```{r, fig.height=9, fig.width=9}
+set.seed(13)
+A <- matrix(c(1, 0,
+              1, 0), 2, 2, byrow=TRUE)
+priors <- c(1, 0)
+pdf.params <- list(mean = c(3, 4), sd=c(2, 5))
+hmm <- NormHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+T <- 100
+xx <- hmm$genSample(T)
+plot.data.summary(xx)
+```
+
+### Оценка параметров
+
+```{r, warning=FALSE}
+selectModelIc(NormHmm, xx, 4, TRUE)
+```
+
+#### Uniform initialization
+
+```{r, warning=FALSE}
+A <- matrix(1/m, m, m)
+priors <- rep(1/m, m)
+pdf.params <- list(mean = c(0, 0), sd=c(1, 1))
+hmm <- NormHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+#### Uniform + noise
+
+```{r, warning=FALSE}
+A <- matrix(1/m, m, m) + runif(m^2)
+A <- A / rowSums(A)
+priors <- rep(1/m, m) + runif(m)
+priors <- priors / sum(priors)
+pdf.params <- list(mean = c(0, 0), sd=c(1, 1))
+hmm <- NormHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+### Моделирование и оценка нескольких выборок подряд
+
+```{r}
+A.ref <- matrix(c(1, 0,
+                  1, 0), 2, 2, byrow=TRUE)
+priors.ref <- c(1, 0)
+pdf.params.ref <- list(mean = c(0, 0), sd=c(1, 1))
+hmm.ref <- NormHmm(A=A.ref, priors=priors.ref, pdf.params=pdf.params.ref)
+N <- 10
+```
+
+#### Uniform init; T = 100
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 100
+res <- test.hmm.consist(hmm.ref, T, N, 'unif')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+#### Uniform + noise; T = 100
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 100
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+hmms[[3]]
+hmms[[6]]
+```
+
+#### Uniform; T = 1000
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+#### Uniform + noise; T = 1000
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+
+## Общий случай
+
+$$\A=\begin{pmatrix}0.3 & 0.7\\
+0.8 & 0.2
+\end{pmatrix},\quad\u=\begin{pmatrix}0.4\\
+0.6
+\end{pmatrix},\quad\m=\begin{pmatrix}3\\
+4
+\end{pmatrix},\quad\s=\begin{pmatrix}2\\
+5
+\end{pmatrix}.
+$$
+
+```{r, fig.height=9, fig.width=9}
+set.seed(13)
+A.ref <- matrix(c(0.3, 0.7,
+                  0.8, 0.2), 2, 2, byrow=TRUE)
+priors.ref <- c(0.4, 0.6)
+pdf.params.ref <- list(mean = c(3, 4), sd=c(2, 5))
+hmm.ref <- NormHmm(A=A.ref, priors=priors.ref, pdf.params=pdf.params.ref)
+N <- 10
+```
+
+```{r, warning=FALSE}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+hmms[[1]]
+hmms[[2]]
+hmms[[3]]
+```
+
+
+# Моделирование категориальной СММ
+
+Моделирование с последующей оценкой параметров ("категориальной") модели с дискретной моделью наблюдений (с матрицей вероятностей наблюдения j при условии состояния i) - если такая оценка с помощью Ваших средств возможна. 
+
+### Моделирование
+
+```{r, fig.height=9, fig.width=9}
+source('categ_hmm.R')
+set.seed(13)
+m <- 2
+k <- 2
+A <- matrix(c(0.5, 0.5,
+              0.5, 0.5), 2, 2, byrow=TRUE)
+priors <- c(0.5, 0.5)
+pdf.params <- list(prob=matrix(c(
+  1, 0,
+  0, 1
+), 2, 2, byrow=TRUE))
+hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+T <- 100
+xx <- hmm$genSample(T)
+print(xx)
+plot.data.summary(xx)
+```
+
+### Оценка параметров
+
+```{r}
+source('modsel.R')
+selectModelIc(CategHmm, xx, 4, TRUE)
+```
+
+#### Uniform + noise
+
+```{r}
+A <- matrix(1/m, m, m) + runif(m^2)
+A <- A / rowSums(A)
+priors <- rep(1/m, m) + runif(m)
+priors <- priors / sum(priors)
+prob <- matrix(1/k, m, k, byrow=TRUE) + runif(m*k)
+prob <- prob / rowSums(prob)
+pdf.params <- list(prob=prob)
+hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+#### Не-uniform
+
+```{r}
+A <- matrix(c(
+  0.1, 0.9,
+  0.3, 0.7),
+m, m, byrow=TRUE)
+priors <-c(0.8, 0.2)
+prob <- matrix(1/k, m, k, byrow=TRUE) + runif(m*k)
+prob <- prob / rowSums(prob)
+pdf.params <- list(prob=prob)
+hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+
+### Моделирование и оценка нескольких выборок подряд
+
+```{r}
+A.ref <- matrix(c(0.5, 0.5,
+              0.5, 0.5), 2, 2, byrow=TRUE)
+priors.ref <- c(0.5, 0.5)
+pdf.params.ref <- list(prob=matrix(c(
+  1, 0,
+  0, 1
+), 2, 2, byrow=TRUE))
+hmm.ref <- CategHmm(A=A.ref, priors=priors.ref, pdf.params=pdf.params.ref)
+N <- 10
+```
+
+#### Uniform + noise; T = 100
+
+```{r}
+set.seed(13)
+T <- 100
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+```
+
+#### Uniform + noise; T = 1000
+
+```{r}
+set.seed(13)
+T <- 1000
+res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
+results <- res[[1]]
+hmms <- res[[2]]
+print(round(results, 2))
+hmms[[1]]
+hmms[[5]]
+```
+
+# Дальнейшая работа
+
+ * Придумать меру разницы между СММ помимо `MLLK`, если в этом вообще есть необходимость.
+ * С помощью категориальной СММ провести повторный анализ текстовых данных как в прошлом году.
+    * При помощи алгоритма интраполяции попытаться заполнить пропуски в тексте.
+ * Попробовать другие алгоритмы оптимизации, менее подверженные застреванию в локальных минимумах (Nelder-Mead?).
+ * Обучить модели со стационарными МЦ.
+ * Построить доверительные интервалы для параметров на основе SE.
+ * Прогноз по Hassan, Hong

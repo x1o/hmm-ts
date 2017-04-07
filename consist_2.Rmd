@@ -1,0 +1,96 @@
+---
+title: "Consistency 2"
+author: "Dmitry Zotikov"
+date: "April 7, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+plot.data.summary <- function(xx) {
+  par(mfrow=c(2,2))
+  plot(xx, type='o', pch=20)
+  hist(xx)
+  acf(xx, length(xx))
+  par(mfrow=c(1,1))
+}
+```
+
+```{r}
+source('pois_hmm.R')
+```
+
+```{r}
+init.ref.pois.model <- function(m, do.plot=FALSE) {
+  lambda <- m
+  A <- matrix(rpois(m^2, lambda), m, m)
+  A <- A / rowSums(A)
+  cat('min / max A:', min(A), ' / ', max(A), '\n')
+  if (do.plot) {
+    min(A); max(A)
+    image(A, zlim=c(0, max(A)), col=terrain.colors(m^2))
+  }
+  priors <- rpois(m, lambda)
+  priors <- priors / sum(priors)
+  lambda <- floor(runif(m, 1, 10))
+  PoisHmm(A=A, priors=priors, pdf.params=list(lambda=lambda))
+}
+```
+
+```{r}
+par(mfrow=c(4,4))
+par(mfrow=c(1,1))
+```
+
+```{r}
+set.seed(1)
+hmm <- init.ref.pois.model(10)
+xx <- hmm$genSample(100)
+plot.data.summary(xx)
+```
+
+```{r}
+set.seed(1)
+cat('llk.ref', 'llk', 'llk.ref - llk', '\n')
+for (m in (seq(2, 15))) {
+  hmm.ref <- init.ref.pois.model(m)
+  xx <- hmm.ref$genSample(100)
+  llk.ref <- hmm.ref$logL(xx)
+  hmm <- PoisHmm(m, xx)
+  if (m == 6) browser()
+  hmm$fit(xx)
+  llk <- hmm$logL(xx)
+  cat(m, '\n')
+  cat(llk.ref, llk, llk.ref - llk, '\n')
+}
+```
+
+
+```{r}
+set.seed(13)
+m <- 2
+A <- matrix(c(1, 0,
+              1, 0), 2, 2, byrow=TRUE)
+priors <- c(1, 0)
+pdf.params <- list(lambda = c(6, 1))
+hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+T <- 100
+xx <- hmm$genSample(T)
+plot.data.summary(xx)
+```
+
+```{r}
+set.seed(13)
+A <- matrix(1/m, m, m)
+priors <- rep(1/m, m)
+pdf.params = list(lambda = c(1,1))
+hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
+print(hmm)
+hmm$fit(xx)
+print(hmm)
+```
+

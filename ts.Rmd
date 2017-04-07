@@ -17,9 +17,9 @@ Earthquakes-count series.
    * Confirmation with `kpss.test` (level/trend stationarity)
  * ARIMA(0, 1, 1) forecasting
 
-## Comparison
+<!-- ## Comparison -->
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 fc.hw.s <- forecast(HoltWinters(tt, beta=FALSE, gamma=FALSE))
 fc.hw <- forecast(HoltWinters(tt, gamma=FALSE))
 fc.arima.011 <- forecast(arima(tt, order=c(0, 1, 1)))
@@ -225,7 +225,7 @@ corrplot(hmm.www$A, method='circle', is.corr=FALSE, addCoef.col = 'black',
          col=col2(100)[30:100])
 ```
 
-```{r, fig.height=10, fig.width=9}
+```{r, eval=FALSE, fig.height=10, fig.width=9, include=FALSE}
 www.probes <- seq(min(WWWusage), max(WWWusage), by=3)
 www.probes <- seq(150, 350, by=4)
 www.fc <- hmm.www$forecast(WWWusage, www.probes, 16)
