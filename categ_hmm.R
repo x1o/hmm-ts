@@ -17,34 +17,75 @@ rdiscr <- function(n, prob) {
   return(out)
 }
 
-str.to.idcs <- function(str, alphabet) {
-  match(unlist(strsplit(str, '')), alphabet)
+str.to.idcs <- function(s, alphabet) {
+  match(unlist(strsplit(s, '')), alphabet)
 }
 
 idcs.to.str <- function(idcs, alphabet) {
   paste(alphabet[idcs], collapse='')
 }
 
+is.string <- function(s) {
+  is.character(s) && (length(s) == 1)
+}
+
+str.to.chars <- function(s) {
+  unlist(strsplit(s, ''))
+}
+
+
+
 CategHmm <- setRefClass("CategHmm",
   contains = "Hmm",
   fields = list(
+    qq = "character"
   ),
   methods = list(
-    initialize = function(m, xx, A, priors, pdf.params) {
+    initialize = function(m, xx, A, priors, pdf.params, qq=character(0), ...) {
+      if (is.string(qq)) {
+        qq <- str.to.chars(qq)
+      }
       if (missing(A) && missing(priors) && missing(pdf.params)) {
-        callSuper(m, xx)
-        # FIXME: better initialization
-        k <- length(unique(xx))
+        # xx is either a "string", or a character or numeric vector
+        if (is.character(xx)) {
+          if (length(nchar(xx)) == 1) {
+            # "string"
+            xx <- str.to.chars(xx)
+          }
+          # char vector
+          qq <<- sort(unique(xx))
+          xx <- match(xx, .self$qq)
+          k <- length(.self$qq)
+        } else {
+          k <- length(unique(xx))
+          if (length(qq) > 0) {
+            if (k != length(qq)) {
+              stop("Observation alphabet length is not equal to the length of the sample alphabet.")
+            }
+            qq <<- qq
+          }
+        }
+        # now xx is numeric
+        callSuper(m, xx, ...)
+        # FIXME: fair initialization?
         m <- getM()
+        # h <- hist(xx, breaks=0:k, plot=FALSE)
+        # pdf.params <<- list(prob=matrix(rep(h$density, m), m, k, byrow=TRUE))
         pdf.params <<- list(prob=matrix(1/k, m, k, byrow=TRUE))
       } else if (missing(m) && missing(xx)) {
         callSuper(A=A, priors=priors)
         pdf.params <<- pdf.params
+        if (length(qq) > 0) {
+          qq <<- qq
+        }
       } else {
         stop("Either m, xx or A, priors and pdf.params should be specified as arguments.")
       }
       pdf <<- ddiscr
       rng <<- rdiscr
+      if (length(.self$qq) > 0) {
+        colnames(pdf.params$prob) <<- .self$qq
+      }
     },
     getWrkParams = function() {
       as.numeric(
@@ -65,10 +106,32 @@ CategHmm <- setRefClass("CategHmm",
       )
       pdf.params <<- list(prob=prob/rowSums(prob))
     },
+    xx.to.numeric = function(xx) {
+      if (is.character(xx)) {
+        if (length(qq) == 0) {
+          stop('No observation alphabet specified.')
+        }
+        if (length(nchar(xx)) == 1) {
+          xx <- str.to.chars(xx)
+        }
+        xx <- match(xx, .self$qq)
+      }
+      return(xx)
+    },
+    fit = function(xx, ...) {
+      callSuper(xx.to.numeric(xx), ...)
+    },
+    logL = function(xx, ...) {
+      callSuper(xx.to.numeric(xx), ...)
+    },
     genSample = function(T) {
       state <- walkChain(T)
       probs <- split(pdf.params$prob, row(pdf.params$prob))
-      rng(T, probs[state])
+      xx <- rng(T, probs[state])
+      if (length(qq) > 0) {
+        xx <- idcs.to.str(xx, qq)
+      }
+      return(xx)
     },
     getK = function() {
       ncol(pdf.params$prob)

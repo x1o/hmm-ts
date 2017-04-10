@@ -5,9 +5,9 @@ PoisHmm <- setRefClass("PoisHmm",
   fields = list(
   ),
   methods = list(
-    initialize = function(m, xx, A, priors, pdf.params) {
+    initialize = function(m, xx, A, priors, pdf.params, ...) {
       if (missing(A) && missing(priors) && missing(pdf.params)) {
-        callSuper(m, xx)
+        callSuper(m, xx, ...)
         pdf.params <<- list(
           lambda = quantile(xx, seq(0, 1, 1/(m + 1)))[2:(m + 1)]
         )
@@ -21,10 +21,16 @@ PoisHmm <- setRefClass("PoisHmm",
       rng <<- rpois
     },
     getWrkParams = function() {
-      as.numeric(
+      pp <- as.numeric(
         c(log(pdf.params$lambda),
           callSuper())
       )
+      non.f.idcs <- !is.finite(pp)
+      if (sum(non.f.idcs) > 0) {
+        cat('Oops! Some of the parameters aren\'t finite.\n')
+        pp[non.f.idcs] <- .Machine$integer.max * sign(pp[non.f.idcs])
+      }
+      return(pp)
     },
     setWrkParams = function(params) {
       # lambda, A (by columns excluding diag), priors : m + m(m-1) + (m-1)

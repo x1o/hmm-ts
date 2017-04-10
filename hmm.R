@@ -8,18 +8,31 @@ Hmm <- setRefClass("Hmm",
     n.iter = "numeric"
   ),
   methods = list(
-    init.from.data = function(m, xx) {
-      A <<- diag(1 - (m - 1) * 0.05, m, m)
-      A[!A] <<- 0.05
+    init.from.data = function(m, r = 10, A.init = 'main.diag') {
+      x <- r / (r - 1 + m)
+      if (A.init == 'main.diag') {
+        A <<- diag(x, m, m)
+      } else if (A.init == 'sec.diag') {
+        if (m == 1) {
+          # Otherwise `apply` simplifies to vector
+          A <<- matrix(1)
+        } else {
+          A <<- apply(diag(x, m, m), 2, rev)
+        }
+      } else {
+        stop('Unknown initialization method.')
+      }
+      A[!A] <<- x / r
       priors <<- rep(1, m) / m
+      priors <<- priors + runif(m, -1/r*1/m, 1/r*1/m)
     },
     init.from.params = function(A, priors) {
       A <<- A
       priors <<- priors
     },
-    initialize = function(m, xx, A, priors) {
+    initialize = function(m, xx, A, priors, ...) {
       if (missing(A) && missing(priors)) {
-        init.from.data(m, xx)
+        init.from.data(m, ...)
       } else if (missing(m) && missing(xx)) {
         init.from.params(A, priors)
       } else {
@@ -46,6 +59,7 @@ Hmm <- setRefClass("Hmm",
       # TODO: stationary case
       log(c((A / diag(A))[!diag(nrow(A))],
             priors[-1] / priors[1]))
+
     },
     setWrkParams = function(params, A.offset) {
       # TODO: stationary case
@@ -66,13 +80,16 @@ Hmm <- setRefClass("Hmm",
         L.log <- log(sum(alpha))
       }
       alpha.norm <- alpha / sum(alpha)
-      for (t in 2:length(xx)) {
-        z <- alpha.norm %*% A * do.call(pdf, c(xx[t], pdf.params))
-        z.sum <- sum(z)
-        if (compute.L) {
-          L.log <- L.log + log(z.sum)
+      if (T > 1) {
+        for (t in 2:T) {
+          bb.t <- do.call(pdf, c(xx[t], pdf.params))
+          z <- alpha.norm %*% A * bb.t
+          z.sum <- sum(z)
+          if (compute.L) {
+            L.log <- L.log + log(z.sum)
+          }
+          alpha.norm <- z / z.sum
         }
-        alpha.norm <- z / z.sum
       }
       if (compute.L) {
         return(L.log)
@@ -85,7 +102,16 @@ Hmm <- setRefClass("Hmm",
     },
     mLogL = function(par.wrk, xx) {
       setWrkParams(par.wrk)
-      -logL(xx)
+      mllk <- -logL(xx)
+      if (!is.finite(mllk)) {
+        cat('Oops! mllk is not finite.\n')
+        # FIXME: NaNs produced
+        # cat('Inf / NA / NaN: ', mllk, '\n')
+        # methods::show(.self)
+        # mllk <- .Machine$integer.max * sign(mllk)
+        mllk <- .Machine$integer.max
+      }
+      return(mllk)
     },
     fit = function(xx, iterlim=1000, method='nlm', ...) {
       if (method == 'nlm') {
@@ -240,6 +266,39 @@ Hmm <- setRefClass("Hmm",
         }
       }
       return(fc)
+    },
+    betaNorm = function(xx) {
+      # dim(t(t(v))) = 3 1, so R works with column-vector by default
+      m <- getM()
+      beta.T <- rep(1/m, m)
+      if (length(xx) > 1) {
+        for (t in (length(xx)-1):1) {
+          bb.next <- do.call(pdf, c(xx[t+1], pdf.params))
+          zz <- (A * bb.next) %*% beta.T
+          beta.T <- zz / sum(zz)
+        }
+      }
+      return(t(beta.T))
+    },
+    interpolateDist = function(xx, x.probes, t.0) {
+      m <- getM()
+      T <- length(xx)
+      if ((t.0 < 1) || (t.0 > T)) {
+        stop(paste('Invalid time', t.0))
+      }
+      beta.norm <- betaNorm(xx[t.0:T])
+      # B.xx is a s x m matrix, s = |x.probes|
+      B.xx <- t(sapply(x.probes, function(x) do.call(pdf, c(x, pdf.params))))
+      if (t.0 == 1) {
+        zz <- t(priors)
+      } else {
+        alpha.norm <- alphaNorm(xx[1:(t.0-1)])
+        zz <- alpha.norm %*% A
+      }
+      denom <- as.vector(zz %*% t(beta.norm))
+      # Matrix by vector scalar multiplication works by columns, hence t(B.xx)
+      dd <- (t(as.vector(zz) * t(B.xx)) %*% t(beta.norm)) / denom
+      return(t(dd))
     },
     aic = function(xx) {
       -2 * logL(xx) + 2*getDf()

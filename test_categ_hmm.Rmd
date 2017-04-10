@@ -13,7 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 source('categ_hmm.R')
-set.seed(1)
 ```
 
 ## Initialization, setting / getting working parameters
@@ -24,15 +23,30 @@ set.seed(1)
 
 ### Init from data
 
+#### Numeric vector
+
 Инициализация по данным происходит как и других СММ; параметры компонент смеси инициализируются равномерно.  Здесь данные --- первые 120 символов генома E.coli, число компонент равно 2:
 
 ```{r}
 m <- 2
-Q <- c('A', 'C', 'G', 'T')
+qq <- c('A', 'C', 'G', 'T')
 xx <- 'GTAAGTATTTTTCAGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGCTTCTGAACTGGTTACCTGCCGTGAGTAAATTAAAATT'
-xx <- str.to.idcs(xx, Q)
+xx <- str.to.idcs(xx, qq)
 xx
 hmm <- CategHmm(m, xx)
+hmm
+hmm <- CategHmm(m, xx, qq=qq, A.init='sec.diag')
+hmm
+```
+
+#### "String" / character vector
+
+```{r}
+m <- 2
+xx <- 'GTAAGTATTTTTCAGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGCTTCTGAACTGGTTACCTGCCGTGAGTAAATTAAAATT'
+hmm <- CategHmm(m, xx)
+hmm
+hmm <- CategHmm(m, unlist(strsplit(xx, '')))
 hmm
 ```
 
@@ -53,6 +67,8 @@ pdf.params <- list(prob=matrix(c(
   0.1, 0.6, 0.1, 0.2
 ), m, k, byrow=TRUE))
 hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params)
+hmm
+hmm <- CategHmm(A=A, priors=priors, pdf.params=pdf.params, qq='ACGT')
 hmm
 hmm$getWrkParams()
 p.w <- hmm$getWrkParams()
@@ -77,7 +93,7 @@ hmm
 hmm <- CategHmm(1, xx)
 hmm$fit(xx)
 hmm
-h <- hist(xx, breaks=0:4, plot=FALSE)
+h <- hist(str.to.idcs(xx, hmm$qq), breaks=0:4, plot=FALSE)
 h$density
 plot(h, freq=FALSE)
 ```
@@ -87,7 +103,5 @@ plot(h, freq=FALSE)
 Моделирование:
 
 ```{r}
-idcs <- hmm$genSample(10)
-idcs
-idcs.to.str(idcs, Q)
+hmm$genSample(10)
 ```

@@ -5,9 +5,9 @@ NormHmm <- setRefClass("NormHmm",
   fields = list(
   ),
   methods = list(
-    initialize = function(m, xx, A, priors, pdf.params) {
+    initialize = function(m, xx, A, priors, pdf.params, ...) {
       if (missing(A) && missing(priors) && missing(pdf.params)) {
-        callSuper(m, xx)
+        callSuper(m, xx, ...)
         pdf.params <<- list(
           mean = seq(min(xx), max(xx), length.out = m + 2)[2:(m + 1)],
           sd = seq(0, sd(xx), length.out = m + 2)[2:(m + 1)]

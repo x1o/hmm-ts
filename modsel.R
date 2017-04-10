@@ -1,9 +1,9 @@
-selectModelIc = function(HmmClass, xx, m.max, do.plot=FALSE) {
+selectModelIc = function(HmmClass, xx, m.max, do.plot=FALSE, ...) {
   aic <- list()
   bic <- list()
   for (m in 1:m.max) {
     cat('m =', m, '\n')
-    hmm <- HmmClass(m, xx)
+    hmm <- HmmClass(m, xx, ...)
     hmm$fit(xx)
     aic[m] <- hmm$aic(xx)
     bic[m] <- hmm$bic(xx)

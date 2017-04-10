@@ -1,0 +1,116 @@
+---
+title: "Interpolation test"
+author: "Dmitry Zotikov"
+date: "April 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Scalar version:
+
+```{r}
+source('pois_hmm.R')
+set.seed(1)
+xx <- rpois(100, 5)
+hmm <- PoisHmm(3, xx)
+hmm$fit(xx)
+# hmm$alphaNorm(xx[1])
+plot(xx, type='o')
+# x.probes <- sort(unique(xx))
+x.probes <- 1:20
+dist <- hmm$interpolateDist(xx, x.probes, 4)
+barplot(dist)
+sum(dist)
+```
+
+```{r}
+source('pois_hmm.R')
+source('import_earthquakes.R')
+set.seed(1)
+xx <- earthquakes.zuc.annual$count
+hmm <- PoisHmm(4, xx)
+hmm$fit(xx)
+plot(xx, type='o')
+x.probes <- 0:50
+dist <- hmm$interpolateDist(xx, x.probes, 5)
+barplot(dist)
+```
+
+```{r}
+par(mfrow=c(4, 4))
+res <- matrix(0, 16, 4)
+colnames(res) <- c('real', 'mode', 'mean', 'median')
+for (s in 1:16) {
+  dist <- hmm$interpolateDist(xx, x.probes, s)
+  # print(sum(dist))
+  # barplot(dist, main=paste('t =', s))
+  plot(x.probes, dist, type="h", main='',
+         xlab='Observations', ylab='Probabilities',
+         xlim=c(min(x.probes), max(x.probes)), ylim=c(0, max(dist)))
+  par(new=TRUE)
+  res[s, 1] <- xx[s]
+  res[s, 2] <- x.probes[which(dist == max(dist))]
+  res[s, 3] <- which.min(abs(x.probes - (t(dist) %*% x.probes)))
+  res[s, 4] <- which.min(abs(cumsum(dist) - 0.5))
+  plot(xx[s], dist[which(x.probes == xx[s])], type="h", lwd=3, axes=FALSE,
+       xlab='', ylab='',
+       xlim=c(min(x.probes), max(x.probes)), ylim=c(0, max(dist)))
+  # axis(3, at=round(x.probes[argmax], 2))
+}
+par(mfcol=c(1,1))
+```
+
+```{r}
+res <- matrix(0, length(xx), 7)
+colnames(res) <- c('real', 'mode', 'mean', 'median', 'd.mode', 'd.mean', 'd.median')
+for (s in 1:length(xx)) {
+  dist <- hmm$interpolateDist(xx, x.probes, s)
+  res[s, 1] <- xx[s]
+  res[s, 2] <- x.probes[which(dist == max(dist))]
+  res[s, 3] <- which.min(abs(x.probes - (dist %*% x.probes)))
+  res[s, 4] <- which.min(abs(cumsum(dist) - 0.5))
+  for (j in 1:3) {
+    res[s, 4+j] <- abs(res[s, 1+j] - res[s, 1])
+  }
+}
+colSums(res)
+correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
+correct
+nrow(correct)
+nrow(correct) / length(xx)
+for (i in 1:3) {
+  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx), '\n')
+}
+```
+
+Vectorized version
+
+```{r}
+source('pois_hmm.R')
+source('import_earthquakes.R')
+set.seed(1)
+xx <- earthquakes.zuc.annual$count
+plot(xx, type='o')
+hmm <- PoisHmm(4, xx)
+hmm$fit(xx)
+x.probes <- sort(unique(xx))
+x.probes <- 0:50
+par(mfrow=c(3, 2))
+dist <- as.vector(hmm$interpolateDist(xx, x.probes, 5))
+for (t in 1:6) {
+  dist <- as.vector(hmm$interpolateDist(xx, x.probes, t))
+  barplot(dist, main=paste('t =', t))
+  sum(dist)
+}
+par(mfcol=c(1,1))
+```
+
+
+```{r}
+source('util_plot.R')
+plotForecast(hmm$forecast(xx, 0:11, 3), xx, 3)
+```
+

@@ -1,0 +1,58 @@
+---
+title: "Marvin the Martian"
+author: "Dmitry Zotikov"
+date: "April 8, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source('categ_hmm.R')
+```
+
+```{r}
+news.bag.path <- '../data/ru_news_bag.txt'
+xx.50k <- readLines(news.bag.path)
+xx.10k <- substring(xx.50k, 1, 10000)
+xx.1k <- substring(xx.50k, 1, 1000)
+m <- 2
+hmm <- CategHmm(m, xx.1k)
+acf(str.to.idcs(xx.1k, hmm$qq), 1000)
+```
+
+Нужно отклонить цепь от равновесия в сторону ситуации `V->C` и `C->V`. Иначе не будет работать.  В состоянии равновесия тоже
+
+```{r}
+hmm$A <- matrix(c(0.4, 0.6,
+                  0.6, 0.4), 2, 2, byrow=TRUE)
+hmm
+Sys.time()
+set.seed(1)
+hmm$fit(xx.1k)
+Sys.time()
+colnames(hmm$pdf.params$prob)  <- hmm$qq
+barplot(hmm$pdf.params$prob)
+```
+
+Непонятно. $m \in {2, 4, 6, 8}$.
+
+```{r}
+source('modsel.R')
+set.seed(1)
+selectModelIc(CategHmm, xx.1k, 4, TRUE, A.init='sec.diag')
+```
+
+```{r}
+set.seed(1)
+m <- 4
+hmm <- CategHmm(m, xx.1k, r = 5, A.init='sec.diag')
+Sys.time()
+hmm$fit(xx.1k)
+Sys.time()
+colnames(hmm$pdf.params$prob)  <- hmm$qq
+barplot(hmm$pdf.params$prob)
+```
+
