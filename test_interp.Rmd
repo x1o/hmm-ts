@@ -9,108 +9,84 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Scalar version:
-
-```{r}
-source('pois_hmm.R')
-set.seed(1)
-xx <- rpois(100, 5)
-hmm <- PoisHmm(3, xx)
-hmm$fit(xx)
-# hmm$alphaNorm(xx[1])
-plot(xx, type='o')
-# x.probes <- sort(unique(xx))
-x.probes <- 1:20
-dist <- hmm$interpolateDist(xx, x.probes, 4)
-barplot(dist)
-sum(dist)
-```
-
-```{r}
+```{r, message=FALSE}
 source('pois_hmm.R')
 source('import_earthquakes.R')
 set.seed(1)
 xx <- earthquakes.zuc.annual$count
-hmm <- PoisHmm(4, xx)
+hmm <- PoisHmm(3, xx)
 hmm$fit(xx)
 plot(xx, type='o')
+```
+
+Point probability of $\xi_{t_0} = 5$ at $t_0 = 4$ (given a sample with $x_{t_0}$ missing).
+
+```{r}
+hmm$interpolateDist(xx, 5, 4)
+```
+
+Distribution of $\xi_{t_0}, t_0 = 4$ (with $x_{t_0}$ missing).
+
+```{r}
+# x.probes <- sort(unique(xx))
 x.probes <- 0:50
-dist <- hmm$interpolateDist(xx, x.probes, 5)
-barplot(dist)
+dd <- hmm$interpolateDist(xx, x.probes, 5)
+barplot(dd)
+sum(dd)
 ```
 
-```{r}
-par(mfrow=c(4, 4))
-res <- matrix(0, 16, 4)
-colnames(res) <- c('real', 'mode', 'mean', 'median')
-for (s in 1:16) {
-  dist <- hmm$interpolateDist(xx, x.probes, s)
-  # print(sum(dist))
-  # barplot(dist, main=paste('t =', s))
-  plot(x.probes, dist, type="h", main='',
-         xlab='Observations', ylab='Probabilities',
-         xlim=c(min(x.probes), max(x.probes)), ylim=c(0, max(dist)))
-  par(new=TRUE)
-  res[s, 1] <- xx[s]
-  res[s, 2] <- x.probes[which(dist == max(dist))]
-  res[s, 3] <- which.min(abs(x.probes - (t(dist) %*% x.probes)))
-  res[s, 4] <- which.min(abs(cumsum(dist) - 0.5))
-  plot(xx[s], dist[which(x.probes == xx[s])], type="h", lwd=3, axes=FALSE,
-       xlab='', ylab='',
-       xlim=c(min(x.probes), max(x.probes)), ylim=c(0, max(dist)))
-  # axis(3, at=round(x.probes[argmax], 2))
-}
-par(mfcol=c(1,1))
-```
+Distribution of $\xi_{t_0}$ for $t_0 \in \{1, 3, \dots, 11 \}$ (with $x_{t_0}$ missing).
 
 ```{r}
-res <- matrix(0, length(xx), 7)
-colnames(res) <- c('real', 'mode', 'mean', 'median', 'd.mode', 'd.mean', 'd.median')
-for (s in 1:length(xx)) {
-  dist <- hmm$interpolateDist(xx, x.probes, s)
-  res[s, 1] <- xx[s]
-  res[s, 2] <- x.probes[which(dist == max(dist))]
-  res[s, 3] <- which.min(abs(x.probes - (dist %*% x.probes)))
-  res[s, 4] <- which.min(abs(cumsum(dist) - 0.5))
-  for (j in 1:3) {
-    res[s, 4+j] <- abs(res[s, 1+j] - res[s, 1])
-  }
-}
-colSums(res)
+D <- hmm$interpolateDist(xx, x.probes, seq(1,12,by=2))
+matplot(t(D), type='b', pch=1:6)
+```
+
+Distribution of $\xi_{t_0}$ for $t_0 \in \{1, \dots, 16 \}$ (with $x_{t_0}$ missing).
+
+```{r, fig.height=9, fig.width=9}
+D <- hmm$interpolateDist(xx, x.probes, 1:16)
+source('util_plot.R')
+plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+```
+
+
+
+```{r}
+source('util_test.R')
+res <- testIntepolation(hmm, xx, x.probes, t.probes)
+```
+
+Не всегда истинное значение совпадало с одной из характеристик положения; тем не менее, было оно довольно "близко".  Предположительно, при уменьшении алфавита, точность возрастет.
+
+```{r}
+head(res)
+```
+
+Точное угадывание хотя бы одной характеристикой:
+
+```{r}
 correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
 correct
+```
+
+ # точных угадываний:
+
+```{r}
 nrow(correct)
+```
+
+% точных угдаываний:
+
+```{r}
 nrow(correct) / length(xx)
+```
+
+% точных угдаываний по каждой характеристике:
+
+```{r}
 for (i in 1:3) {
   cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx), '\n')
 }
-```
-
-Vectorized version
-
-```{r}
-source('pois_hmm.R')
-source('import_earthquakes.R')
-set.seed(1)
-xx <- earthquakes.zuc.annual$count
-plot(xx, type='o')
-hmm <- PoisHmm(4, xx)
-hmm$fit(xx)
-x.probes <- sort(unique(xx))
-x.probes <- 0:50
-par(mfrow=c(3, 2))
-dist <- as.vector(hmm$interpolateDist(xx, x.probes, 5))
-for (t in 1:6) {
-  dist <- as.vector(hmm$interpolateDist(xx, x.probes, t))
-  barplot(dist, main=paste('t =', t))
-  sum(dist)
-}
-par(mfcol=c(1,1))
-```
-
-
-```{r}
-source('util_plot.R')
-plotForecast(hmm$forecast(xx, 0:11, 3), xx, 3)
 ```
 

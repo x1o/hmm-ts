@@ -33,25 +33,52 @@ plotForecast <- function(fc, xx, h.max, xx.true=numeric(0)) {
   #        add=TRUE, pch=NA)
 }
 
-plotForecastDist <- function(fc.dist, xx, x.probes, h.plot=c()) {
-  plot.idcs <- 1:nrow(fc.dist)
+plotForecastDist <- function(D, xx, x.probes, h.plot=c(), xx.true=c()) {
+  plot.idcs <- 1:nrow(D)
   if (length(h.plot) != 0) {
     plot.idcs <- h.plot
   }
   n.plots <- length(plot.idcs)
   par(mfrow=c(floor(sqrt(n.plots)), ceiling(n.plots/floor(sqrt(n.plots)))))
   for (h in plot.idcs) {
-    plot(x.probes, fc.dist[h,], type="h", main='',
+    xlim <- c(min(x.probes), max(x.probes))
+    ylim <- c(0, max(D[h,]))
+    # plot(x.probes, D[h,], type="h", main='',
+    #      xlab='Observations', ylab='Probabilities',
+    #      xlim=range(xx), ylim=c(0, max(D)))
+    plot(x.probes, D[h,], type="h", main='',
          xlab='Observations', ylab='Probabilities',
-         xlim=range(xx), ylim=c(0, max(fc.dist)))
+         xlim=xlim, ylim=ylim)
     title(paste("h =", h), line = 2)
     par(new=TRUE)
-    argmax = which.max(fc.dist[h,])
-    plot(x.probes[argmax], fc.dist[h, argmax], type="h", lwd=3, axes=FALSE,
-         xlab='', ylab='',
-         xlim=range(xx), ylim=c(0, max(fc.dist)))
-    axis(3, at=round(x.probes[argmax], 2))
-    # cat('h = ', h, ': F[', argmax, '] = ', fc.dist[h, argmax], '\n', sep='')
+    if (length(xx.true) > 0) {
+      # if (is.character(xx) && (length(xx) == 1)) {
+      #   # a string
+      #   x.true <- substr(xx.true, h, h)
+      # } else {
+      #   x.true <- xx.true[h]
+      # }
+      x.true <- xx.true[h]
+      x.idx.true <- which(x.probes == x.true)
+      plot(x.true, D[h, x.idx.true],
+           type="h", lwd=3, axes=FALSE,
+           xlab='', ylab='',
+           xlim=xlim, ylim=ylim)
+      # axis(3, at=round(x.probes[argmax], 2))
+      # axis(1, at=1:33, labels=hmm$qq)
+      # axis(2, at=seq(0, 0.14, by=0.02))
+      # box()
+    } else {
+      argmax = which.max(D[h,])
+      # plot(x.probes[argmax], D[h, argmax], type="h", lwd=3, axes=FALSE,
+      #      xlab='', ylab='',
+      #      xlim=range(xx), ylim=c(0, max(D)))
+      plot(x.probes[argmax], D[h, argmax], type="h", lwd=3, axes=FALSE,
+           xlab='', ylab='',
+           xlim=xlim, ylim=ylim)
+      axis(3, at=round(x.probes[argmax], 2))
+      # cat('h = ', h, ': F[', argmax, '] = ', D[h, argmax], '\n', sep='')
+    }
   }
   par(mfrow=c(1,1))
 }

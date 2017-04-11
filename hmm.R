@@ -280,25 +280,46 @@ Hmm <- setRefClass("Hmm",
       }
       return(t(beta.T))
     },
-    interpolateDist = function(xx, x.probes, t.0) {
+    interpolateDist = function(xx, x.probes, t.probes) {
       m <- getM()
       T <- length(xx)
-      if ((t.0 < 1) || (t.0 > T)) {
-        stop(paste('Invalid time', t.0))
+      # browser()
+      D <- matrix(0, length(t.probes), length(x.probes))
+      for (j in 1:length(t.probes)) {
+        t.0 <- t.probes[j]
+        if ((t.0 < 1) || (t.0 > T)) {
+          stop(paste('Invalid time', t.0))
+        }
+        beta.norm <- betaNorm(xx[t.0:T])
+        # B.xx is a l x m matrix, l = |x.probes|
+        B.xx <- t(sapply(x.probes, function(x) do.call(pdf, c(x, pdf.params))))
+        if (t.0 == 1) {
+          zz <- t(priors)
+        } else {
+          alpha.norm <- alphaNorm(xx[1:(t.0-1)])
+          zz <- alpha.norm %*% A
+        }
+        # Matrix by vector scalar multiplication works by columns, hence t(B.xx)
+        num <- t(as.vector(zz) * t(B.xx)) %*% t(beta.norm)
+        denom <- as.vector(zz %*% t(beta.norm))
+        D[j,] <- t(num / denom)
       }
-      beta.norm <- betaNorm(xx[t.0:T])
-      # B.xx is a s x m matrix, s = |x.probes|
-      B.xx <- t(sapply(x.probes, function(x) do.call(pdf, c(x, pdf.params))))
-      if (t.0 == 1) {
-        zz <- t(priors)
+      return(D)
+    },
+    interpolate = function(xx, x.probes, t.probes, method='mode') {
+      D <- interpolateDist(xx, x.probes, t.probes)
+      if (method == 'mode') {
+        ii <- x.probes[apply(D, 1, which.max)]
+      } else if (method == 'mean') {
+        M <- matrix(rep(D %*% x.probes, length(x.probes)),
+                    length(x.probes), length(t.probes), byrow=TRUE)
+        ii <- apply(abs(x.probes - M), 2, which.min)
+      } else if (method == 'median') {
+        ii <- apply(abs(t(apply(D, 1, cumsum)) - 0.5), 1, which.min)
       } else {
-        alpha.norm <- alphaNorm(xx[1:(t.0-1)])
-        zz <- alpha.norm %*% A
+        stop(paste('Unknown method', method))
       }
-      denom <- as.vector(zz %*% t(beta.norm))
-      # Matrix by vector scalar multiplication works by columns, hence t(B.xx)
-      dd <- (t(as.vector(zz) * t(B.xx)) %*% t(beta.norm)) / denom
-      return(t(dd))
+      return(ii)
     },
     aic = function(xx) {
       -2 * logL(xx) + 2*getDf()

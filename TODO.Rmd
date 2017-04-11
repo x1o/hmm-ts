@@ -1,0 +1,40 @@
+---
+title: "main"
+author: "Dmitry Zotikov"
+date: "March 26, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+- E, D of norm
+- MC ACF
+- Fit MC
+- Find MC stationary distribution
+- stationary mc distribution -- when important? one extra multiplication is
+  not a big deal...
+- hmm pdf in the case of a stationary MC
+- sd or sd^2?
+- hist of gen.sample -- unimodal??
+- forecast for continuous
+- while fitting, check the code; if not 1, act appropriately
+- Понять, почему важно иметь предсказание распределения (для геологов) и т.д.
+- Задачи, где СММ выбирают модель
+- Максимум hist и curve / pdf в графиках
+- prediction on smoothed ts?
+- is hmm necessary? if acf != 0, just work with differences
+- Кросс-валидация vs AIC/BIC
+- Документ по IC
+- Доверительный интервал через профили
+- $\max_{x}\P(\xi_{T+h}=x\mid\mathbf{x})$
+- Протестировать на модельном решении (нагенерить ряд как смесь тренда, периодики, шума)
+- Ансамбль моделей
+- The state-dependent density functions can also be estimated nonparametrically, hence avoiding the need to make any distributional assumption (Langrock et al., 2015)
+- Ссылка на то, когда оценки состоятельны (от НЭ)
+- Попробовать другие алгоритмы оптимизации, менее подверженные застреванию в локальных минимумах (Nelder-Mead?).
+- Обучить модели со стационарными МЦ.
+- Построить доверительные интервалы для параметров на основе SE.
+- Прогноз по Hassan, Hong
+- Ширина доверительного интервала в зависимости от объема выборки :)

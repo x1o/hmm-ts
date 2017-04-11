@@ -33,7 +33,7 @@ str.to.chars <- function(s) {
   unlist(strsplit(s, ''))
 }
 
-
+# TODO: this should probably be split into CategHmm and StringHmm
 
 CategHmm <- setRefClass("CategHmm",
   contains = "Hmm",
@@ -132,6 +132,9 @@ CategHmm <- setRefClass("CategHmm",
         xx <- idcs.to.str(xx, qq)
       }
       return(xx)
+    },
+    interpolateDist = function(xx, x.probes, t.probes) {
+      callSuper(xx.to.numeric(xx), xx.to.numeric(x.probes), xx.to.numeric(t.probes))
     },
     getK = function() {
       ncol(pdf.params$prob)

@@ -1,5 +1,5 @@
 ---
-title: "Marvin the Martian"
+title: "Marvin the Martian Learns Russian"
 author: "Dmitry Zotikov"
 date: "April 8, 2017"
 output: html_document
@@ -13,46 +13,135 @@ knitr::opts_chunk$set(echo = TRUE)
 source('categ_hmm.R')
 ```
 
+Обучаем модель на корпусе российских новостей объемами 1000, 10000 и 50000.
+
 ```{r}
 news.bag.path <- '../data/ru_news_bag.txt'
 xx.50k <- readLines(news.bag.path)
 xx.10k <- substring(xx.50k, 1, 10000)
 xx.1k <- substring(xx.50k, 1, 1000)
 m <- 2
-hmm <- CategHmm(m, xx.1k)
-acf(str.to.idcs(xx.1k, hmm$qq), 1000)
+hmm.2.1k <- CategHmm(m, xx.1k)
 ```
 
-Нужно отклонить цепь от равновесия в сторону ситуации `V->C` и `C->V`. Иначе не будет работать.  В состоянии равновесия тоже
+Видно, что автокорреляции не сильно выражены
 
 ```{r}
-hmm$A <- matrix(c(0.4, 0.6,
-                  0.6, 0.4), 2, 2, byrow=TRUE)
-hmm
-Sys.time()
-set.seed(1)
-hmm$fit(xx.1k)
-Sys.time()
-colnames(hmm$pdf.params$prob)  <- hmm$qq
-barplot(hmm$pdf.params$prob)
+acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000)
 ```
 
-Непонятно. $m \in {2, 4, 6, 8}$.
+Нужно отклонить цепь от равновесия в сторону ситуации `V->C` и `C->V`. Иначе не будет работать.  В состоянии равновесия тоже (см. дневник исследователя, конечно)
+
+```{r}
+hmm.2.1k$A <- matrix(c(0.4, 0.6,
+                  0.6, 0.4), 2, 2, byrow=TRUE)
+hmm.2.1k
+Sys.time()
+set.seed(1)
+hmm.2.1k$fit(xx.1k)
+Sys.time()
+colnames(hmm.2.1k$pdf.params$prob)  <- hmm.2.1k$qq
+barplot(hmm.2.1k$pdf.params$prob)
+```
+
+Непонятно, какую модель стоит предпочесть по AIC / BIC: $m \in {2, 4, 6, 8}$?s
 
 ```{r}
 source('modsel.R')
 set.seed(1)
-selectModelIc(CategHmm, xx.1k, 4, TRUE, A.init='sec.diag')
+selectModelIc(CategHmm, xx.1k, 16, TRUE, A.init='sec.diag')
 ```
+
+Обучене с $m=4$ значительно уменьшает `mllk` (с 2864 до 2775); состояния модели хуже поддаются интерпретации.
 
 ```{r}
 set.seed(1)
 m <- 4
-hmm <- CategHmm(m, xx.1k, r = 5, A.init='sec.diag')
+hmm.4.1k <- CategHmm(m, xx.1k, r = 5, A.init='sec.diag')
 Sys.time()
-hmm$fit(xx.1k)
+hmm.4.1k$fit(xx.1k)
 Sys.time()
-colnames(hmm$pdf.params$prob)  <- hmm$qq
-barplot(hmm$pdf.params$prob)
+colnames(hmm.4.1k$pdf.params$prob)  <- hmm.4.1k$qq
+barplot(hmm.4.1k$pdf.params$prob)
 ```
 
+## Восстановление наблюдений (экстраполяция)
+
+Распределение наблюдений на 2-м шаге (при отсутствующем наблюдений на втором шаге в выборке):
+
+```{r}
+dd <- hmm.4.1k$interpolateDist(xx.1k, hmm.4.1k$qq, 2)
+colnames(dd) <- hmm.4.1k$qq
+barplot(dd)
+```
+
+Распределения с шага 16 по 31.  Видно, что угадывания не очень-то хороши
+
+```{r, fig.height=9, fig.width=9}
+source('util_plot.R')
+x.probes <- hmm.4.1k$qq
+D <- hmm.4.1k$interpolateDist(xx.1k, x.probes, 1:100)
+# FIXME: only numeric data allowed
+xx.1k.num <- str.to.idcs(xx.1k, hmm.4.1k$qq)
+x.probes.num <- 1:33
+t.probes <- 16:31
+plotForecastDist(D, xx.1k.num, x.probes.num, t.probes, xx.1k.num)
+```
+
+```{r}
+source('util_test.R')
+res <- testIntepolation(hmm.4.1k, xx.1k.num, x.probes.num, t.probes)
+head(res)
+correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
+correct
+nrow(correct)
+nrow(correct) / length(xx.1k.num)
+for (i in 1:3) {
+  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx.1k.num), '\n')
+}
+```
+
+Ну, хорошо.  А что если просто HMM плохо описывают текст на естественном языке?  Пусть у нас есть текст, хорошо соответствующий модели -- т.е. такой, который мы сами сгенерировали этой моделью.
+
+```{r}
+set.seed(1)
+xx.gen <- hmm.4.1k$genSample(1000)
+xx.gen
+```
+
+Для контраста любопытно посмотреть текст, сгенерированный по модам распределений:
+
+```{r}
+D <- hmm.4.1k$interpolateDist(xx.1k, x.probes, 1:500)
+idcs.to.str(apply(D, 1, which.max), x.probes)
+```
+
+Снова для $m=8$
+
+```{r}
+set.seed(1)
+hmm.8.1k <- CategHmm(8, xx.1k, A.init='sec.diag')
+hmm.8.1k$fit(xx.1k)
+D <- hmm.8.1k$interpolateDist(xx.1k, x.probes, 1:500)
+idcs.to.str(apply(D, 1, which.max), x.probes)
+```
+
+Прогнозы получаются неинтересным
+
+```{r}
+plotForecast(hmm.8.1k$forecast(xx.1k.num, x.probes.num, 16, method='mode'), xx.1k.num, 16)
+plotForecastDist(hmm.8.1k$forecastDist(xx.1k.num, x.probes.num, 16), xx.1k.num, x.probes.num)
+```
+
+```{r}
+xx <- str.to.idcs(xx.gen, x.probes)
+res <- testIntepolation(hmm.8.1k, xx, x.probes.num, 1:100)
+head(res)
+correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
+correct
+nrow(correct)
+nrow(correct) / length(xx)
+for (i in 1:3) {
+  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx), '\n')
+}
+```
