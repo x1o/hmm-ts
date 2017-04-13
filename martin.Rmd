@@ -28,6 +28,14 @@ hmm.2.1k <- CategHmm(m, xx.1k)
 
 ```{r}
 acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-acf-1k.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,1)+0.1)  # bottom, left, top, right
+# acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000, main='')
+# par(mar=mar.old)
+# dev.off()
 ```
 
 Нужно отклонить цепь от равновесия в сторону ситуации `V->C` и `C->V`. Иначе не будет работать.  В состоянии равновесия тоже (см. дневник исследователя, конечно)
@@ -42,14 +50,43 @@ hmm.2.1k$fit(xx.1k)
 Sys.time()
 colnames(hmm.2.1k$pdf.params$prob)  <- hmm.2.1k$qq
 barplot(hmm.2.1k$pdf.params$prob)
+
+# cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/martin-B-2-good.ps",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# barplot(hmm.2.1k$pdf.params$prob)
+# par(mar=mar.old)
+# dev.off()
 ```
 
-Непонятно, какую модель стоит предпочесть по AIC / BIC: $m \in {2, 4, 6, 8}$?s
+```{r}
+hmm.2.1k.bad <- CategHmm(2, xx.1k)
+hmm.2.1k.bad$A <- matrix(c(0.6, 0.4,
+                           0.4, 0.6), 2, 2, byrow=TRUE)
+hmm.2.1k.bad
+Sys.time()
+set.seed(1)
+hmm.2.1k.bad$fit(xx.1k)
+Sys.time()
+colnames(hmm.2.1k.bad$pdf.params$prob)  <- hmm.2.1k$qq
+barplot(hmm.2.1k.bad$pdf.params$prob)
+
+# cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/martin-B-2-bad.ps",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# barplot(hmm.2.1k.bad$pdf.params$prob)
+# par(mar=mar.old)
+# dev.off()
+```
+
+AIC: 4, BIC: 2
 
 ```{r}
 source('modsel.R')
 set.seed(1)
-selectModelIc(CategHmm, xx.1k, 16, TRUE, A.init='sec.diag')
+selectModelIc(CategHmm, xx.1k, 8, TRUE, A.init='sec.diag')
 ```
 
 Обучене с $m=4$ значительно уменьшает `mllk` (с 2864 до 2775); состояния модели хуже поддаются интерпретации.
@@ -65,7 +102,7 @@ colnames(hmm.4.1k$pdf.params$prob)  <- hmm.4.1k$qq
 barplot(hmm.4.1k$pdf.params$prob)
 ```
 
-## Восстановление наблюдений (экстраполяция)
+## Восстановление наблюдений (интерполяция)
 
 Распределение наблюдений на 2-м шаге (при отсутствующем наблюдений на втором шаге в выборке):
 
@@ -86,6 +123,14 @@ xx.1k.num <- str.to.idcs(xx.1k, hmm.4.1k$qq)
 x.probes.num <- 1:33
 t.probes <- 16:31
 plotForecastDist(D, xx.1k.num, x.probes.num, t.probes, xx.1k.num)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-interp-16-32.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# plotForecastDist(D, xx.1k.num, x.probes.num, t.probes, xx.1k.num)
+# par(mar=mar.old)
+# dev.off()
 ```
 
 ```{r}
@@ -116,32 +161,15 @@ D <- hmm.4.1k$interpolateDist(xx.1k, x.probes, 1:500)
 idcs.to.str(apply(D, 1, which.max), x.probes)
 ```
 
-Снова для $m=8$
-
 ```{r}
-set.seed(1)
-hmm.8.1k <- CategHmm(8, xx.1k, A.init='sec.diag')
-hmm.8.1k$fit(xx.1k)
-D <- hmm.8.1k$interpolateDist(xx.1k, x.probes, 1:500)
-idcs.to.str(apply(D, 1, which.max), x.probes)
-```
-
-Прогнозы получаются неинтересным
-
-```{r}
-plotForecast(hmm.8.1k$forecast(xx.1k.num, x.probes.num, 16, method='mode'), xx.1k.num, 16)
-plotForecastDist(hmm.8.1k$forecastDist(xx.1k.num, x.probes.num, 16), xx.1k.num, x.probes.num)
-```
-
-```{r}
-xx <- str.to.idcs(xx.gen, x.probes)
-res <- testIntepolation(hmm.8.1k, xx, x.probes.num, 1:100)
+xx.gen.num <- str.to.idcs(xx.gen, x.probes)
+res <- testIntepolation(hmm.4.1k, xx.gen.num, x.probes.num, 1:100)
 head(res)
 correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
 correct
 nrow(correct)
-nrow(correct) / length(xx)
+nrow(correct) / length(xx.gen.num)
 for (i in 1:3) {
-  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx), '\n')
+  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx.gen.num), '\n')
 }
 ```

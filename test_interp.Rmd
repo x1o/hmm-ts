@@ -47,10 +47,15 @@ Distribution of $\xi_{t_0}$ for $t_0 \in \{1, \dots, 16 \}$ (with $x_{t_0}$ miss
 ```{r, fig.height=9, fig.width=9}
 D <- hmm$interpolateDist(xx, x.probes, 1:16)
 source('util_plot.R')
-plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+# par(mar=mar.old)
+# dev.off()
 ```
-
-
 
 ```{r}
 source('util_test.R')

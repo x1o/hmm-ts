@@ -143,6 +143,12 @@ CategHmm <- setRefClass("CategHmm",
       m <- getM()
       # row-stochastic A + priors + pdf.params
       m*(m-1) + (m-1) + (getK() - 1) * m
+    },
+    aic = function(xx) {
+      callSuper(xx.to.numeric(xx))
+    },
+    bic = function(xx) {
+      callSuper(xx.to.numeric(xx))
     }
   )
 )

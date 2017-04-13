@@ -29,7 +29,6 @@ knitr::opts_chunk$set(echo = TRUE)
 - Документ по IC
 - Доверительный интервал через профили
 - $\max_{x}\P(\xi_{T+h}=x\mid\mathbf{x})$
-- Протестировать на модельном решении (нагенерить ряд как смесь тренда, периодики, шума)
 - Ансамбль моделей
 - The state-dependent density functions can also be estimated nonparametrically, hence avoiding the need to make any distributional assumption (Langrock et al., 2015)
 - Ссылка на то, когда оценки состоятельны (от НЭ)
@@ -38,3 +37,4 @@ knitr::opts_chunk$set(echo = TRUE)
 - Построить доверительные интервалы для параметров на основе SE.
 - Прогноз по Hassan, Hong
 - Ширина доверительного интервала в зависимости от объема выборки :)
+- Потестить СММ на данных с заведомо высокой автокорреляцией

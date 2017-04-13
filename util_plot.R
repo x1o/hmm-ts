@@ -1,3 +1,11 @@
+plotDataSummary <- function(xx) {
+  par(mfrow=c(2,2))
+  plot(xx, type='o', pch=20, xlab='')
+  hist(xx, main='', xlab='')
+  acf(xx, length(xx), main='', xlab='')
+  par(mfrow=c(1,1))
+}
+
 plotForecast <- function(fc, xx, h.max, xx.true=numeric(0)) {
   T <- length(xx)
   ylim <- range(c(xx, xx.true))

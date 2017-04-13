@@ -43,6 +43,7 @@ T.train <- T-h.max
 xx.train <- xx[1:(T.train)]
 xx.true <- xx[(T.train+1):T]
 hmm <- PoisHmm(4, xx.train)
+set.seed(1)
 hmm$fit(xx.train)
 plotForecastDist(hmm$forecastDist(xx.train, x.probes, h.max), xx.train, x.probes)
 par(mfrow=c(3,1))
@@ -62,27 +63,41 @@ source('norm_hmm.R')
 source('modsel.R')
 library('forecast')
 
-set.seed(2)
+set.seed(1)
 T <- 100
 tt <- seq(0, 4*pi, length.out=T)
-# par(mfrow=c(3, 1))
-xx <- 1 + 0.5*tt
-# plot(xx, type='l')
-xx <- xx + sin(2*tt)
-# plot(xx, type='l')
-xx <- xx + runif(100, -2, 2)
+par(mfrow=c(3, 1))
+xx.line <- 1 + 0.5*tt
+plot(xx.line, type='l')
+xx.sine <- xx.line + sin(2*tt)
+plot(xx.sine, type='l')
+xx <- xx.sine + runif(100, -2, 2)
 xx <- ts(xx)
+plot(xx, type='o')
+par(mfrow=c(1,1))
+acf(xx, T)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-data.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,1,0)+0.1)  # bottom, left, top, right
+# par(mfrow=c(3, 1))
+# plot(xx.line, type='l')
+# plot(xx.sine, type='l')
 # plot(xx, type='o')
 # par(mfrow=c(1,1))
-# acf(xx, T)
+# par(mar=mar.old)
+# dev.off()
+
 
 h.max <- 16
-
 x.probes <- seq(min(xx), max(xx), length.out = 50)
+
 # selectModelIc(NormHmm, xx, 7, TRUE)  # 2
-hmm <- NormHmm(2, xx)
+set.seed(1)
+hmm <- NormHmm(3, xx)
 hmm$fit(xx)
-plotA(hmm)
+hmm
 ```
 
 ```{r, fig.height=10, fig.width=9}
@@ -94,11 +109,49 @@ for (avg in c('mean', 'median', 'mode')) {
   title(avg)
 }
 par(mfrow=c(1,1))
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-3.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,2,1)+0.1)  # bottom, left, top, right
+# par(mfrow=c(3,1))
+# for (avg in c('mean', 'median', 'mode')) {
+#   fc <- hmm$forecast(xx, x.probes, h.max, avg)
+#   plotForecast(fc, xx, h.max)
+#   title(avg)
+# }
+# par(mfrow=c(1,1))
+# par(mar=mar.old)
+# dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-dist-3.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,1.8,1)+0.1)  # bottom, left, top, right
+# plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
+# par(mar=mar.old)
+# dev.off()
 ```
 
+```{r, eval=FALSE, include=FALSE}
+for (m in c(2:8)) {
+  set.seed(1)
+  hmm <- NormHmm(m, xx)
+  hmm$fit(xx)
+  par(mfrow=c(3,1))
+  for (avg in c('mean', 'median', 'mode')) {
+    fc <- hmm$forecast(xx, x.probes, h.max, avg)
+    plotForecast(fc, xx, h.max)
+    title(paste('m =', m, avg))
+  }
+  par(mfrow=c(1,1))
+}
+```
+
+
 ```{r}
-# auto.arima(xx)
-plot(forecast(arima(xx, order=c(0, 1, 1)), h.max))
+auto.arima(xx)
+plot(forecast(arima(xx, order=c(1, 1, 1)), h.max))
 ```
 
 ## Sine model with train/test forecasting
@@ -109,8 +162,8 @@ source('norm_hmm.R')
 source('modsel.R')
 library('forecast')
 
-set.seed(2)
-T <- 100
+set.seed(1)
+T <- 200
 tt <- seq(0, 4*pi, length.out=T)
 xx <- ts(1 + 0.5*tt + sin(2*tt) + runif(100, -2, 2))
 
@@ -120,10 +173,11 @@ xx.train <- xx[1:(T.train)]
 xx.true <- xx[(T.train+1):T]
 
 x.probes <- seq(min(xx.train), max(xx.train), length.out = 50)
-# selectModelIc(NormHmm, xx.train, 7, TRUE)  # 4, 2
+selectModelIc(NormHmm, xx.train, 7, TRUE)  # 4, 2
 hmm <- NormHmm(2, xx.train)
+set.seed(1)
 hmm$fit(xx.train)
-plotA(hmm)
+hmm
 ```
 
 ```{r, fig.height=10, fig.width=9, message=FALSE}
@@ -135,11 +189,45 @@ for (avg in c('mean', 'median', 'mode')) {
   title(avg)
 }
 par(mfrow=c(1,1))
+
+set.seed(1)
+hmm <- NormHmm(4, xx.train)
+hmm$fit(xx.train)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-test-4.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,2,1)+0.1)  # bottom, left, top, right
+# par(mfrow=c(3,1))
+# for (avg in c('mean', 'median', 'mode')) {
+#   fc <- hmm$forecast(xx.train, x.probes, h.max, avg)
+#   plotForecast(fc, xx.train[100:length(xx.train)], h.max, xx.true)
+#   title(avg)
+# }
+# par(mfrow=c(1,1))
+# par(mar=mar.old)
+# dev.off()
 ```
 
+```{r, eval=FALSE, include=FALSE}
+for (m in c(2:7)) {
+  set.seed(1)
+  hmm <- NormHmm(m, xx.train)
+  hmm$fit(xx.train)
+  par(mfrow=c(3,1))
+  for (avg in c('mean', 'median', 'mode')) {
+    fc <- hmm$forecast(xx.train, x.probes, h.max, avg)
+    plotForecast(fc, xx.train, h.max, xx.true)
+    title(paste('m =', m, avg))
+  }
+  par(mfrow=c(1,1))
+}
+```
+
+
 ```{r}
-# auto.arima(xx)
-plot(forecast(arima(xx, order=c(0, 1, 1)), h.max))
+auto.arima(xx.train)
+plot(forecast(arima(xx.train, order=c(0, 1, 1)), h.max))
 ```
 
 ### $m=4$
@@ -147,7 +235,8 @@ plot(forecast(arima(xx, order=c(0, 1, 1)), h.max))
 ```{r}
 hmm <- NormHmm(4, xx.train)
 hmm$fit(xx.train)
-plotA(hmm)
+# plotA(hmm)
+hmm
 ```
 
 ```{r, fig.height=10, fig.width=9, message=FALSE}
@@ -159,9 +248,4 @@ for (avg in c('mean', 'median', 'mode')) {
   title(avg)
 }
 par(mfrow=c(1,1))
-```
-
-```{r}
-# auto.arima(xx)
-plot(forecast(arima(xx, order=c(0, 1, 1)), h.max))
 ```

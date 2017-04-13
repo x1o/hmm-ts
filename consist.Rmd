@@ -21,13 +21,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 source('util_plot.R')
-plot.data.summary <- function(xx) {
-  par(mfrow=c(2,2))
-  plot(xx, type='o', pch=20)
-  hist(xx)
-  acf(xx, length(xx))
-  par(mfrow=c(1,1))
-}
 ```
 
 # Моделирование Poisson
@@ -42,8 +35,10 @@ plot.data.summary <- function(xx) {
 
 ```{r}
 source('pois_hmm.R')
+source('util_plot.R')
 ```
 
+<!-- где pdf plot, вставить mar.old <- par()$mar -->
 
 ## Вырожденный случай
 
@@ -68,7 +63,15 @@ hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
 print(hmm)
 T <- 100
 xx <- hmm$genSample(T)
-plot.data.summary(xx)
+plotDataSummary(xx)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/mod-pois-data-01.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,1,1)+0.1)  # bottom, left, top, right
+# plotDataSummary(xx)
+# par(mar=mar.old)
+# dev.off()
 ```
 
 ### Оценка параметров
@@ -80,6 +83,12 @@ plot.data.summary(xx)
 ```{r}
 source('modsel.R')
 selectModelIc(PoisHmm, xx, 4, TRUE)
+
+pdf(file="~/Documents/СПбГУ/Диплом/pic/mod-pois-ic-01.pdf",
+    width=6.06, height=4.06, pointsize=12)
+par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+selectModelIc(PoisHmm, xx, 4, TRUE)
+dev.off()
 ```
 
 #### Uniform initialization
@@ -90,7 +99,7 @@ selectModelIc(PoisHmm, xx, 4, TRUE)
 set.seed(13)
 A <- matrix(1/m, m, m)
 priors <- rep(1/m, m)
-pdf.params = list(lambda = c(1,1))
+pdf.params <- list(lambda = c(1,1))
 hmm <- PoisHmm(A=A, priors=priors, pdf.params=pdf.params)
 print(hmm)
 hmm$fit(xx)
@@ -292,7 +301,7 @@ N <- 10
 
 ```{r, warning=FALSE}
 set.seed(13)
-T <- 900
+T <- 1000
 res <- test.hmm.consist(hmm.ref, T, N, 'unif+noise')
 results <- res[[1]]
 hmms <- res[[2]]
@@ -335,7 +344,7 @@ hmm <- NormHmm(A=A, priors=priors, pdf.params=pdf.params)
 print(hmm)
 T <- 100
 xx <- hmm$genSample(T)
-plot.data.summary(xx)
+plotDataSummary(xx)
 ```
 
 ### Оценка параметров
@@ -487,7 +496,7 @@ print(hmm)
 T <- 100
 xx <- hmm$genSample(T)
 print(xx)
-plot.data.summary(xx)
+plotDataSummary(xx)
 ```
 
 ### Оценка параметров

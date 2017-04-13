@@ -10,18 +10,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-plot.data.summary <- function(xx) {
-  par(mfrow=c(2,2))
-  plot(xx, type='o', pch=20)
-  hist(xx)
-  acf(xx, length(xx))
-  par(mfrow=c(1,1))
-}
+source('pois_hmm.R')
+source('util_plot.R')
 ```
 
 ```{r}
-source('pois_hmm.R')
+rot.90.cw <- function(A) {
+  t(apply(A, 2, rev))
+}
 ```
+
 
 ```{r}
 init.ref.pois.model <- function(m, do.plot=FALSE) {
@@ -31,7 +29,11 @@ init.ref.pois.model <- function(m, do.plot=FALSE) {
   if (do.plot) {
     cat('min / max A:', min(A), ' / ', max(A), '\n')
     min(A); max(A)
-    image(A, zlim=c(0, max(A)), col=terrain.colors(m^2))
+    image(rot.90.cw(A), zlim=c(0, max(A)),
+          col=terrain.colors(m^3),
+          axes=FALSE,
+          main=paste('m = ', m, '; min = ', round(min(A), 2), ', max =', round(max(A), 2),
+                     sep=''))
   }
   priors <- rpois(m, lambda)
   priors <- priors / sum(priors)
@@ -44,19 +46,33 @@ init.ref.pois.model <- function(m, do.plot=FALSE) {
 set.seed(1)
 m <- 10
 T <- 100
-hmm.ref <- init.ref.pois.model(m)
+hmm.ref <- init.ref.pois.model(m, TRUE)
 xx <- hmm.ref$genSample(T)
-plot.data.summary(xx)
+plotDataSummary(xx)
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/mod-pois-A-m-2-4-6-8.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# par(mfcol=c(2,2))
+# mar.old <- par()$mar
+# par(mar=c(2,2,2,1)+0.1)  # bottom, left, top, right
+# set.seed(1)
+# for (m in c(2,4,6,8)) {
+#   hmm <- init.ref.pois.model(m, TRUE)
+#   show(hmm$A)
+# }
+# par(mfcol=c(1,1))
+# par(mar=mar.old)
+# dev.off()
 ```
 
 ```{r}
-set.seed(1)
 m.max <- 25
 res <- matrix(0, m.max, 4)
 colnames(res) <- c('mllk.ref', 'mllk', 'mllk.ref - mllk', 'n.iter')
 mm <- seq(2, m.max)
 cat(colnames(res), '\n')
 for (k in 1:length(mm)) {
+  set.seed(1)
   cat('m = ', mm[k], '... ')
   hmm.ref <- init.ref.pois.model(mm[k])
   xx <- hmm.ref$genSample(100)
@@ -71,4 +87,12 @@ for (k in 1:length(mm)) {
 }
 ```
 
-Проблема в get / set working parameters: `log(exp(-999)) = 0 != -999`
+```{r}
+set.seed(1)
+hmm.ref.23 <- init.ref.pois.model(23)
+xx <- hmm.ref.23$genSample(100)
+mllk.ref <- -hmm.ref.23$logL(xx)
+hmm.23 <- PoisHmm(23, xx)
+hmm.23$fit(xx)
+```
+

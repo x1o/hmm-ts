@@ -23,8 +23,8 @@ Hmm <- setRefClass("Hmm",
         stop('Unknown initialization method.')
       }
       A[!A] <<- x / r
-      priors <<- rep(1, m) / m
-      priors <<- priors + runif(m, -1/r*1/m, 1/r*1/m)
+      priors <<- rep(1, m) / m + runif(m, -1/r*1/m, 1/r*1/m)
+      priors <<- priors / sum(priors)
     },
     init.from.params = function(A, priors) {
       A <<- A
