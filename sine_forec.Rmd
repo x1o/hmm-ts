@@ -9,6 +9,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+w.8 <- 5.21
+h.8 <- 3.23
+w.10 <- 6.51
+h.10 <- 4.04
+w.12 <- w.10*1.2
+h.12 <- h.10*1.2
+```
+
 ## EQ-Pois forward forecasting
 
 ```{r, eval=FALSE, message=FALSE, include=FALSE}
@@ -20,6 +29,7 @@ xx <- earthquakes.zuc.annual$count
 x.probes <- 0:50
 h.max <- 16
 
+set.seed(1)
 hmm <- PoisHmm(4, xx)
 hmm$fit(xx)
 # plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
@@ -131,6 +141,28 @@ par(mfrow=c(1,1))
 # plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
 # par(mar=mar.old)
 # dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-dist-3-th.pdf",
+#     width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,1.8,1)+0.1)  # bottom, left, top, right
+# plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
+# par(mar=mar.old)
+# dev.off()
+
+pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-3-th.pdf",
+    width=w.12, height=h.12, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,2,0.5)+0.1)  # bottom, left, top, right
+par(mfrow=c(3,1))
+for (avg in c('mean', 'median', 'mode')) {
+  fc <- hmm$forecast(xx, x.probes, h.max, avg)
+  plotForecast(fc, xx, h.max)
+  title(avg)
+}
+par(mfrow=c(1,1))
+par(mar=mar.old)
+dev.off()
 ```
 
 ```{r, eval=FALSE, include=FALSE}
@@ -194,15 +226,49 @@ set.seed(1)
 hmm <- NormHmm(4, xx.train)
 hmm$fit(xx.train)
 
-# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-test-4.pdf",
-#     width=6.06, height=4.06, pointsize=12)
+pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-test-4.pdf",
+    width=6.06, height=4.06, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,2,1)+0.1)  # bottom, left, top, right
+par(mfrow=c(3,1))
+for (avg in c('mean', 'median', 'mode')) {
+  fc <- hmm$forecast(xx.train, x.probes, h.max, avg)
+  plotForecast(fc, xx.train[100:length(xx.train)], h.max, xx.true,
+               ylim=c(0, 8), xaxt='n')
+  title(avg)
+  axis(1, at=seq(0, 100, 20), labels=100+seq(0, 100, 20))
+}
+par(mfrow=c(1,1))
+par(mar=mar.old)
+dev.off()
+
+pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-dist-4.pdf",
+    width=6.06, height=4.06, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,1.8,1)+0.1)  # bottom, left, top, right
+plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
+par(mar=mar.old)
+dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-dist-4-th.pdf",
+#     width=w.12, height=h.12, pointsize=12)
 # mar.old <- par()$mar
-# par(mar=c(2,2,2,1)+0.1)  # bottom, left, top, right
+# par(mar=c(2,2,1.8,1)+0.1)  # bottom, left, top, right
+# plotForecastDist(hmm$forecastDist(xx, x.probes, h.max), xx, x.probes)
+# par(mar=mar.old)
+# dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/sine-forec-test-4-th.pdf",
+#     width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,2,0)+0.1)  # bottom, left, top, right
 # par(mfrow=c(3,1))
 # for (avg in c('mean', 'median', 'mode')) {
 #   fc <- hmm$forecast(xx.train, x.probes, h.max, avg)
-#   plotForecast(fc, xx.train[100:length(xx.train)], h.max, xx.true)
+#   plotForecast(fc, xx.train[100:length(xx.train)], h.max, xx.true, 
+#                ylim=c(0, 8), xaxt='n')
 #   title(avg)
+#   axis(1, at=seq(0, 100, 20), labels=100+seq(0, 100, 20))
 # }
 # par(mfrow=c(1,1))
 # par(mar=mar.old)

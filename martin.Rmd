@@ -10,6 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+w.8 <- 5.21
+h.8 <- 3.23
+w.10 <- 6.51
+h.10 <- 4.04
+w.12 <- w.10*1.2
+h.12 <- h.10*1.2
+```
+
+```{r}
 source('categ_hmm.R')
 ```
 
@@ -31,6 +40,14 @@ acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000)
 
 # pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-acf-1k.pdf",
 #     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,1)+0.1)  # bottom, left, top, right
+# acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000, main='')
+# par(mar=mar.old)
+# dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-acf-1k-th.pdf",
+#     width=w.10, height=h.10, pointsize=12)
 # mar.old <- par()$mar
 # par(mar=c(2,2,0,1)+0.1)  # bottom, left, top, right
 # acf(str.to.idcs(xx.1k, hmm.2.1k$qq), 1000, main='')
@@ -58,6 +75,16 @@ barplot(hmm.2.1k$pdf.params$prob)
 # barplot(hmm.2.1k$pdf.params$prob)
 # par(mar=mar.old)
 # dev.off()
+
+# cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/martin-B-2-good-th.ps",
+#     width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# # barplot(hmm.2.1k$pdf.params$prob, xpd=TRUE)
+# b <- barplot(hmm.2.1k$pdf.params$prob, axisnames=FALSE, legend.text=c('Гласная', 'Согласная'))
+# text(x=b, y=-0.025, hmm.2.1k$qq, xpd=TRUE)
+# par(mar=mar.old)
+# dev.off()
 ```
 
 ```{r}
@@ -79,6 +106,20 @@ barplot(hmm.2.1k.bad$pdf.params$prob)
 # barplot(hmm.2.1k.bad$pdf.params$prob)
 # par(mar=mar.old)
 # dev.off()
+
+# b <- barplot(hmm.2.1k$pdf.params$prob, axisnames=FALSE, legend.text=c('Гласная', 'Согласная'))
+# text(x=b, y=-0.025, hmm.2.1k$qq, xpd=TRUE)
+# par(mar=mar.old)
+# dev.off()
+
+cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/martin-B-2-bad-th.ps",
+   width=w.12, height=h.12, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+b <- barplot(hmm.2.1k.bad$pdf.params$prob, axisnames=FALSE, legend.text=c('Гласная', 'Согласная'))
+text(x=b, y=-0.025, hmm.2.1k.bad$qq, xpd=TRUE)
+par(mar=mar.old)
+dev.off()
 ```
 
 AIC: 4, BIC: 2
@@ -86,7 +127,15 @@ AIC: 4, BIC: 2
 ```{r}
 source('modsel.R')
 set.seed(1)
-selectModelIc(CategHmm, xx.1k, 8, TRUE, A.init='sec.diag')
+selectModelIc(CategHmm, xx.1k, 1, TRUE, A.init='sec.diag')
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-ic-th.pdf",
+#     width=w.10, height=h.10, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(4,2,0,0)+0.1)  # bottom, left, top, right
+# selectModelIc(CategHmm, xx.1k, 6, TRUE, A.init='sec.diag')
+# par(mar=mar.old)
+# dev.off()
 ```
 
 Обучене с $m=4$ значительно уменьшает `mllk` (с 2864 до 2775); состояния модели хуже поддаются интерпретации.

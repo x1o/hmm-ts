@@ -40,6 +40,19 @@ source('util_plot.R')
 
 <!-- где pdf plot, вставить mar.old <- par()$mar -->
 
+<!-- 469 pt. = 6.51389 in. golden ratio = 1.61 ==>
+ * 80%: 5.21 x 3.23
+ * 100%: 6.51 x 4.04-->
+ 
+```{r}
+w.8 <- 5.21
+h.8 <- 3.23
+w.10 <- 6.51
+h.10 <- 4.04
+```
+
+
+
 ## Вырожденный случай
 
 Моделируем данные из $$\A=\begin{pmatrix}1 & 0\\
@@ -67,6 +80,14 @@ plotDataSummary(xx)
 
 # pdf(file="~/Documents/СПбГУ/Диплом/pic/mod-pois-data-01.pdf",
 #     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,1,1)+0.1)  # bottom, left, top, right
+# plotDataSummary(xx)
+# par(mar=mar.old)
+# dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/mod-pois-data-01-th.pdf",
+#     width=w.10, height=h.10, pointsize=12)
 # mar.old <- par()$mar
 # par(mar=c(2,2,1,1)+0.1)  # bottom, left, top, right
 # plotDataSummary(xx)

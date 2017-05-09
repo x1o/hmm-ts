@@ -6,11 +6,13 @@ plotDataSummary <- function(xx) {
   par(mfrow=c(1,1))
 }
 
-plotForecast <- function(fc, xx, h.max, xx.true=numeric(0)) {
+plotForecast <- function(fc, xx, h.max, xx.true=numeric(0), ylim, ...) {
   T <- length(xx)
-  ylim <- range(c(xx, xx.true))
+  if (missing(ylim)) {
+    ylim <- range(c(xx, xx.true))
+  }
   plot(xx, type='o', pch=20, xlab='', ylab='', bty='n',
-       xlim=c(1, T+h.max), ylim=ylim)
+       xlim=c(1, T+h.max), ylim=ylim, ...)
   tt.fc <- (T+1):(T+h.max)
   band.colors <- c('#B1B5CE', '#DBDBDF')
   for (j in rev(1:ncol(fc$upper))) {
@@ -21,14 +23,14 @@ plotForecast <- function(fc, xx, h.max, xx.true=numeric(0)) {
   par(new=TRUE)
   plot(tt.fc, fc$forecast, col='blue',
        type='o', pch=20, axes=FALSE, xlab='', ylab='',
-       xlim=c(1, T+h.max), ylim=ylim)
+       xlim=c(1, T+h.max), ylim=ylim, ...)
   abline(v=T, lty=2)
   if (length(xx.true) != 0) {
     par(new=TRUE)
     plot(tt.fc, xx.true,
          xlim=c(1, T+h.max), ylim=ylim,
          xlab='', ylab='',
-         type='o', pch=21, lty='dashed', axes=FALSE)
+         type='o', pch=21, lty='dashed', axes=FALSE, ...)
   }
   box()
   # close-up

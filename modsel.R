@@ -1,6 +1,6 @@
 selectModelIc = function(HmmClass, xx, m.max, do.plot=FALSE, ...) {
-  aic <- list()
-  bic <- list()
+  aic <- list() # TODO: should be a numeric()
+  bic <- list() # TODO: should be a numeric()
   for (m in 1:m.max) {
     cat('m =', m, '\n')
     hmm <- HmmClass(m, xx, ...)
@@ -10,7 +10,7 @@ selectModelIc = function(HmmClass, xx, m.max, do.plot=FALSE, ...) {
   }
   if (do.plot) {
     matplot(cbind(aic, bic), type='b', pch=c(1,2),
-            main='', xlab='m')
+            main='', xlab='m', ylab='')
   }
   legend("topleft", bty = "n",
          legend = c('AIC', 'BIC'),

@@ -9,6 +9,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+w.8 <- 5.21
+h.8 <- 3.23
+w.10 <- 6.51
+h.10 <- 4.04
+w.12 <- w.10*1.2
+h.12 <- h.10*1.2
+```
+
 ```{r, message=FALSE}
 source('pois_hmm.R')
 source('import_earthquakes.R')
@@ -17,6 +26,14 @@ xx <- earthquakes.zuc.annual$count
 hmm <- PoisHmm(3, xx)
 hmm$fit(xx)
 plot(xx, type='o')
+
+pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-acf-th.pdf",
+    width=w.10, height=h.10, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+acf(xx, length(xx))
+par(mar=mar.old)
+dev.off()
 ```
 
 Point probability of $\xi_{t_0} = 5$ at $t_0 = 4$ (given a sample with $x_{t_0}$ missing).
@@ -47,6 +64,7 @@ Distribution of $\xi_{t_0}$ for $t_0 \in \{1, \dots, 16 \}$ (with $x_{t_0}$ miss
 ```{r, fig.height=9, fig.width=9}
 D <- hmm$interpolateDist(xx, x.probes, 1:16)
 source('util_plot.R')
+plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
 
 # pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16.pdf",
 #     width=6.06, height=4.06, pointsize=12)
@@ -55,6 +73,14 @@ source('util_plot.R')
 # plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
 # par(mar=mar.old)
 # dev.off()
+
+pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16-th.pdf",
+    width=w.12, height=h.12, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+par(mar=mar.old)
+dev.off()
 ```
 
 ```{r}
