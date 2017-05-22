@@ -1,6 +1,6 @@
-source('import_earthquakes.R')
-source('pois_hmm.R')
-source('norm_hmm.R')
+source('../util/import_earthquakes.R')
+source('../models/pois_hmm.R')
+source('../models/norm_hmm.R')
 
 xx <- earthquakes.usgs.annual$count
 
@@ -22,7 +22,7 @@ xx <- earthquakes.usgs.annual$count
 pdf(file="~/Documents/СПбГУ/Диплом/pic/eq-count-ts.pdf",
     width=6.06, height=4.06, pointsize=12)
 par(mar=c(4,4,0,1)+0.1)  # bottom, left, top, right
-plot(earthquakes.usgs.annual$year, xx, type='o', pch=20, 
+plot(earthquakes.usgs.annual$year, xx, type='o', pch=20,
      ylab='Earthquake count', xlab='Year')
 dev.off()
 
@@ -31,7 +31,7 @@ dev.off()
 pdf(file="~/Documents/СПбГУ/Диплом/pic/eq-count-ts-half.pdf",
     width=3.03, height=3.38, pointsize=12)
 par(mar=c(4,4,0,1)+0.1)  # bottom, left, top, right
-plot(earthquakes.usgs.annual$year, xx, type='p', pch=20, 
+plot(earthquakes.usgs.annual$year, xx, type='p', pch=20,
      ylab='Earthquake count', xlab='Year', lwd=0.5)
 dev.off()
 
@@ -60,7 +60,7 @@ dev.off()
 
 # ---
 
-source('pois-mixture.R')
+source('../models/pois-mixture.R')
 
 # pdf(file="~/Documents/СПбГУ/Диплом/pic/pois-mixture-m2.pdf",
 #     width=6.06, height=4.06, pointsize=12)
@@ -100,7 +100,7 @@ dev.off()
 
 # ---
 
-source('pois_hmm.R')
+source('../models/pois_hmm.R')
 
 pdf(file="~/Documents/СПбГУ/Диплом/pic/pois-hmm-m2-half.pdf",
     width=3.03, height=3.38, pointsize=12)
@@ -150,7 +150,7 @@ dev.off()
 
 #---
 
-source('test_hmm.R')
+source('../test/test_hmm.R')
 
 pdf(file="~/Documents/СПбГУ/Диплом/pic/pois-hmm-ms.pdf",
     width=6.06, height=4.06, pointsize=12)
@@ -158,7 +158,7 @@ par(mar=c(4,4,3,0)+0.1)  # bottom, left, top, right
 testHmmFit(PoisHmm, xx, 4, TRUE)
 dev.off()
 
-source('hmm.R')
+source('../models/hmm.R')
 
 pdf(file="~/Documents/СПбГУ/Диплом/pic/pois-eq-aic-bic-half.pdf",
     width=3.03, height=3.38, pointsize=12)
@@ -168,8 +168,8 @@ dev.off()
 
 # ---
 
-source('pois_hmm.R')
-source('norm_hmm.R')
+source('../models/pois_hmm.R')
+source('../models/norm_hmm.R')
 
 pdf(file="~/Documents/СПбГУ/Диплом/pic/norm-hmm-eq-forecast-16.pdf",
     width=6.06, height=4.06, pointsize=12)
@@ -272,6 +272,6 @@ plotCI((T.train+1):T, x.probes[apply(F, 1, which.max)],
        add=TRUE, pch=NA)
 legend("topright", legend = c("Observed values", "HMM forecast", "90% conf. int."),
        bty = "n",
-       col = c('black', "red", 'black'), 
+       col = c('black', "red", 'black'),
        lty = c(1, 1, 2))
 dev.off()

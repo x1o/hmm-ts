@@ -19,13 +19,13 @@ h.12 <- h.10*1.2
 ```
 
 ```{r}
-source('categ_hmm.R')
+source('../models/categ_hmm.R')
 ```
 
 Обучаем модель на корпусе российских новостей объемами 1000, 10000 и 50000.
 
 ```{r}
-news.bag.path <- '../data/ru_news_bag.txt'
+news.bag.path <- '../../data/ru_news_bag.txt'
 xx.50k <- readLines(news.bag.path)
 xx.10k <- substring(xx.50k, 1, 10000)
 xx.1k <- substring(xx.50k, 1, 1000)
@@ -125,7 +125,7 @@ dev.off()
 AIC: 4, BIC: 2
 
 ```{r}
-source('modsel.R')
+source('../util/modsel.R')
 set.seed(1)
 selectModelIc(CategHmm, xx.1k, 1, TRUE, A.init='sec.diag')
 
@@ -164,7 +164,7 @@ barplot(dd)
 Распределения с шага 16 по 31.  Видно, что угадывания не очень-то хороши
 
 ```{r, fig.height=9, fig.width=9}
-source('util_plot.R')
+source('../util/util_plot.R')
 x.probes <- hmm.4.1k$qq
 D <- hmm.4.1k$interpolateDist(xx.1k, x.probes, 1:100)
 # FIXME: only numeric data allowed
@@ -183,7 +183,7 @@ plotForecastDist(D, xx.1k.num, x.probes.num, t.probes, xx.1k.num)
 ```
 
 ```{r}
-source('util_test.R')
+source('../util/util_test.R')
 res <- testIntepolation(hmm.4.1k, xx.1k.num, x.probes.num, t.probes)
 head(res)
 correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))

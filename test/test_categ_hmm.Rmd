@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-source('categ_hmm.R')
+source('../models/categ_hmm.R')
 ```
 
 ## Initialization, setting / getting working parameters

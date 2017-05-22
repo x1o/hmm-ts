@@ -1,0 +1,75 @@
+---
+title: "Test PoisHmm"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r}
+source('../util/import_earthquakes.R')
+source('../util/modsel.R')
+source('../models/pois_hmm.R')
+```
+
+```{r}
+xx.eq.count <- earthquakes.zuc.annual$count
+```
+
+## Init
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count)
+print(hmm)
+```
+
+## Parameter conversions
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count)
+par.wrk <- hmm$getWrkParams()
+hmm$setWrkParams(par.wrk)
+print(hmm)
+```
+
+## alphaNorm
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count)
+print(hmm$alphaNorm(xx.eq.count))
+print(hmm$alphaNorm(xx.eq.count, compute.L = TRUE))
+```
+
+## fit
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count, r=2)
+print(hmm)
+hmm$fit(xx.eq.count)
+print(hmm)
+# testHmmFit(HmmClass, xx, 4, is.discrete.hmm)
+```
+
+## Sampling
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count)
+hmm$fit(xx.eq.count)
+hist(hmm$genSample(100000), breaks=30, col='grey', freq=FALSE)
+```
+
+## Forecasting
+
+```{r}
+hmm <- PoisHmm(3, xx.eq.count)
+hmm$fit(xx.eq.count)
+F <- hmm$forecastDist(xx.eq.count, 1:50, 4)
+plot(F[4,], type="h", xlim=c(0,50), ylim=c(0, 0.1), main=paste("h =", 4))
+# testHmmForecast(HmmClass, xx, 16, is.discrete.hmm)
+```
+
+## AIC & BIC
+
+```{r}
+selectModelIc(PoisHmm, xx.eq.count, 6, do.plot = TRUE)
+```
+

@@ -1,0 +1,42 @@
+---
+title: "Mixture Test"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r}
+source('../util/import_earthquakes.R')
+source('../util/test_mixtures.R')
+```
+
+# Pois Mixture
+
+```{r}
+source('../models/pois_mixture.R')
+
+# xx <- earthquakes.zuc.annual$count
+xx <- earthquakes.usgs.annual$count
+
+# plot(earthquakes.usgs.annual$year, xx, type="o", pch=20)
+# # h <- hist(xx, breaks=20, plot=FALSE)
+# # h$density <- h$density / length(h$breaks)
+# # plot(h, freq=FALSE, col="grey")
+# lambda=mean(xx)
+# hist(xx, breaks=30, freq=FALSE, ylab='', xlab='', col='grey',
+#      xlim=c(0, max(xx)), ylim=c(0, dpois(floor(lambda), lambda)))
+# par(new=TRUE)
+# plot(dpois(0:max(xx), lambda), pch=16, axes=FALSE,
+#      xlim=c(0, max(xx)), ylim=c(0, dpois(floor(lambda), lambda)))
+
+# test.pois.mix()
+```
+
+# Norm Mixture
+
+```{r}
+source('../models/norm_mixture.R')
+
+# test.norm.mix(xx, 9)
+```
+

@@ -18,9 +18,13 @@ w.12 <- w.10*1.2
 h.12 <- h.10*1.2
 ```
 
+```{r}
+source('../models/pois_hmm.R')
+source('../util/import_earthquakes.R')
+```
+
+
 ```{r, message=FALSE}
-source('pois_hmm.R')
-source('import_earthquakes.R')
 set.seed(1)
 xx <- earthquakes.zuc.annual$count
 hmm <- PoisHmm(3, xx)
@@ -63,7 +67,7 @@ Distribution of $\xi_{t_0}$ for $t_0 \in \{1, \dots, 16 \}$ (with $x_{t_0}$ miss
 
 ```{r, fig.height=9, fig.width=9}
 D <- hmm$interpolateDist(xx, x.probes, 1:16)
-source('util_plot.R')
+source('../util/util_plot.R')
 plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
 
 # pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16.pdf",
@@ -84,7 +88,7 @@ dev.off()
 ```
 
 ```{r}
-source('util_test.R')
+source('.../util/util_test.R')
 res <- testIntepolation(hmm, xx, x.probes, t.probes)
 ```
 

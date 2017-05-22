@@ -1,0 +1,46 @@
+---
+title: "Test Norm Hmm"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source('../models/norm_hmm.R')
+source('../util/import_earthquakes.R')
+```
+
+```{r}
+xx.eq.mag <- earthquakes.usgs.annual$mag.mean
+```
+
+
+## Forecasting
+
+```{r}
+# FIXME
+xx <- earthquakes.usgs.annual$mag.mean
+h.max <- 32
+T <- length(xx)
+T.train <- T-h.max
+xx.train <- xx[1:(T.train)]
+hmm <- NormHmm(3, xx.train)
+hmm$fit(xx.train)
+# F <- hmm$forecastDist(xx, x.probes, 16)
+# hmm$plotForecastDist(F, xx, x.probes)
+plot(xx.train, type='o', pch=20,
+     xlim=c(1, T), ylim=range(xx))
+par(new=TRUE)
+plot((T.train+1):T, hmm$genSample(h.max),
+     type='o', pch=1, axes=FALSE,
+     xlim=c(1, T), ylim=range(xx))
+abline(v=T.train, lty=2)
+par(new=TRUE)
+plot((T.train+1):T, xx[(T.train+1):T], col='green',
+     type='o', pch=20,
+     xlim=c(1, T), ylim=range(xx))
+```

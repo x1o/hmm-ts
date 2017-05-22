@@ -1,0 +1,65 @@
+---
+title: "kmeans"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mvtnorm)
+
+nn.0 <- rmvnorm(1000,
+                mean=c(1, 3),
+                sigma=matrix(c(0.5, -0.2,
+                               -0.2, 0.5), 2, 2, byrow=TRUE))
+nn.1 <- rmvnorm(1000,
+                mean=c(3, 1),
+                sigma=matrix(c(0.5, 0.2,
+                               0.2, 0.5), 2, 2, byrow=TRUE))
+nn <- rbind(nn.0, nn.1)
+km <- kmeans(nn, 2)
+plot(nn[subset=km$cluster==1,], xlim=c(-1, 5), ylim=c(-1, 5), col='blue')
+par(new=TRUE)
+plot(nn[subset=km$cluster==2,], xlim=c(-1, 5), ylim=c(-1, 5), col='red')
+points(km$centers, col=c('blue', 'red'))
+
+source('../utils/import_earthquakes.R')
+
+xx <- earthquakes.zuc.annual$count
+km <- kmeans(xx, 4)
+plot(xx, type='b')
+for (center in floor(km$centers)) {
+  abline(h=center)
+}
+
+km <- kmeans(xx, 4)
+stripchart(xx, method='stack')
+for (center in floor(km$centers)) {
+  abline(v=center)
+}
+
+m <- 3
+km <- kmeans(xx, m, iter.max=20, nstart = 10)
+for (i in 1:m) {
+  stripchart(xx[km$cluster==i], col=i+1, method='jitter', xlim=c(min(xx), max(xx)))
+  par(new=TRUE)
+}
+par(new=FALSE)
+
+yy <- rnorm(300, 4, 0.2)
+yy <- c(yy, rnorm(300), 1, 1)
+# plot(yy)
+# hist(yy, breaks=20)
+stripchart(yy, method='jitter')
+km <- kmeans(yy, 2, nstart=5)
+for (i in 1:2) {
+  stripchart(yy[km$cluster==i], col=i+1, method='jitter', xlim=c(min(yy), max(yy)))
+  par(new=TRUE)
+}
+par(new=FALSE)
+```
+

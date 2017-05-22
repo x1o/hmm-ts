@@ -1,0 +1,60 @@
+---
+title: "Test MNorm Hmm"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source('../models/mnorm_hmm.R')
+```
+
+```{r}
+AAPL <- read_csv("../../data/AAPL.csv",
+                 col_types = cols(Date = col_date(format = "%Y-%m-%d")))
+X.AAPL <- as.matrix(subset(AAPL, select=c('Open', 'High', 'Low', 'Adj Close')))
+X.AAPL.2 <- X.AAPL[,c(1,4)]
+```
+
+## Init
+
+```{r}
+m <- 3
+hmm <- MNormHmm(m, X.AAPL.2, do.plot=TRUE)
+print(hmm)
+```
+
+## Parameter conversions
+
+```{r}
+m <- 3
+hmm <- MNormHmm(m, X.AAPL)
+print(hmm)
+par.wrk <- hmm$getWrkParams()
+hmm$setWrkParams(par.wrk)
+print(hmm)
+```
+
+## alphaNorm
+
+```{r}
+m <- 3
+hmm <- MNormHmm(m, X.AAPL.2)
+print(hmm)
+hmm$alphaNorm(X.AAPL.2, TRUE)
+```
+
+## fit
+
+```{r}
+m <- 2
+set.seed(1)
+hmm <- MNormHmm(m, X.AAPL.2, r=2)
+print(hmm)
+hmm$fit(X.AAPL.2, iterlim=200)
+hmm
+```

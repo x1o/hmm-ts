@@ -21,9 +21,9 @@ h.12 <- h.10*1.2
 ## EQ-Pois forward forecasting
 
 ```{r, eval=FALSE, message=FALSE, include=FALSE}
-source('import_earthquakes.R')
-source('util_plot.R')
-source('pois_hmm.R')
+source('../util/import_earthquakes.R')
+source('../util/util_plot.R')
+source('../models/pois_hmm.R')
 
 xx <- earthquakes.zuc.annual$count
 x.probes <- 0:50
@@ -40,9 +40,6 @@ plotForecast(fc, xx, h.max)
 ## EQ-Pois train/test forecasting
 
 ```{r, fig.height=10, fig.width=9, message=FALSE, include=FALSE}
-source('import_earthquakes.R')
-source('util_plot.R')
-source('pois_hmm.R')
 
 xx <- earthquakes.zuc.annual$count
 x.probes <- 0:50
@@ -68,9 +65,8 @@ par(mfrow=c(1,1))
 ## Sine model forward forecasting
 
 ```{r}
-source('util_plot.R')
-source('norm_hmm.R')
-source('modsel.R')
+source('../models/norm_hmm.R')
+source('../util/modsel.R')
 library('forecast')
 
 set.seed(1)
@@ -189,11 +185,6 @@ plot(forecast(arima(xx, order=c(1, 1, 1)), h.max))
 ## Sine model with train/test forecasting
 
 ```{r}
-source('util_plot.R')
-source('norm_hmm.R')
-source('modsel.R')
-library('forecast')
-
 set.seed(1)
 T <- 200
 tt <- seq(0, 4*pi, length.out=T)

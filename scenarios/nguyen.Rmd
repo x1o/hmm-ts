@@ -1,0 +1,366 @@
+---
+title: "Nguyen"
+author: "Dmitry Zotikov"
+date: "May 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+trade.sim <- function(X, fc, start.cap=1000) {
+  caps <- numeric(0)
+  # browser()
+  cap <- start.cap
+  n.stock <- 0
+  caps <- c(caps, cap)
+  for (i in 1:nrow(X.test)) {
+    p.open <- X.test[i,1]
+    p.close.pred <- fc[i]
+    p.close <- X.test[i,4]
+    if (p.open > p.close.pred) { # sell
+      cap <- cap + n.stock * p.open
+      n.stock <- 0
+      # end of the day: buy
+      n.stock <- floor(cap / p.close)
+      cap <- cap - n.stock * p.close
+    } else { # buy
+      n.stock <- n.stock + floor(cap / p.open)
+      cap <- cap - floor(cap / p.open) * p.open
+      # end of the day: sell
+      cap <- cap + n.stock * p.close
+      n.stock <- 0
+    }
+    caps <- c(caps, cap)
+  }
+  return(caps)
+}
+
+mape <- function(X, Fc) {
+  1/nrow(X) * sum(abs(X[,4] - Fc) / X[,4])
+}
+```
+
+```{r}
+source('../models/mnorm_hmm.R')
+library(readr)
+```
+
+## Common data
+
+```{r}
+AAPL <- read_csv("~/Desktop/Диплом/data/AAPL_ng.csv",
+                 col_types = cols(Date = col_date(format = "%Y-%m-%d")))
+X <- as.matrix(subset(AAPL, select=c('Open', 'High', 'Low', 'Adj Close')))
+offset <- which(AAPL$Date == '2015-06-12')
+X.test <- X[(offset+1):nrow(X),]
+```
+
+```{r}
+l <- 100
+ylim <- c(min(X.test[,4]), max(X.test[,4]))
+```
+
+## Gupta
+
+```{r}
+X.return <- matrix(
+  c((X[,4] - X[,1]) / X[,1] * 100,
+    (X[,2] - X[,1]) / X[,1] * 100,
+    (X[,1] - X[,3]) / X[,1] * 100),
+  nrow(X), 3)
+X.return.train <- X.return[(offset-l+1):offset,]
+
+m <- 2
+set.seed(1)
+hmm.gupta.2 <- MNormHmm(m, X.return.train, r=2)
+hmm.gupta.2$fit(X.return.train)
+
+fc.gupta.2 <- list()
+for (k in (offset+1):nrow(X)) {
+  cat('k:', k, '\n')
+  minmax <- rbind(apply(X.return.train, 2, min),
+                  apply(X.return.train, 2, max))
+  x.probes <- apply(minmax, 2, function(x) seq(x[1], x[2], length.out=200))
+  D <- hmm.gupta.2$forecastDist(X.return.train, x.probes, 1)
+  plot(D[1,], type='h', main=k)
+  fc.idx <- hmm.gupta.2$forecast(X.return.train, x.probes, 1)$forecast
+  fc.gupta.2[[k]] <- x.probes[fc.idx,]
+  print(fc.gupta.2[[k]])
+  if (k == nrow(X)) {
+    break
+  } else {
+    X.return.train <- X.return[(k-l+1):k,]
+    hmm.gupta.2$fit(X.return.train)
+  }
+  cat('\n')
+}
+
+fc.price.gupta.2 <- numeric(0)
+for (k in (offset+1):nrow(X)) {
+  fc.price.gupta.2 <- c(fc.price.gupta.2,
+                        fc.gupta.2[[k]][1] * X[k,1] / 100 + X[k,1])
+}
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.price.gupta.2, col='blue', type='o', ylim=ylim)
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+mape.gupta.2 <- mape(X.test, fc.price.gupta.2)
+```
+
+## Nguyen
+
+```{r}
+X.train <- X[(offset-l+1):offset,]
+```
+
+### m = 2
+
+```{r}
+m <- 2
+set.seed(1)
+hmm.ng.2 <- MNormHmm(m, X.train, r=2)
+
+LLKS.ng.2 <- matrix(0, 1, l, byrow=TRUE)
+
+for (k in offset:(nrow(X)-1)) {
+  cat('k:', k, '\n')
+  X.train <- X[(k-l+1):k,]
+  hmm.ng.2$fit(X.train)
+  llks <- numeric(0)
+  for (j in (k:(k-l+1))) {
+    llks <- c(llks, hmm.ng.2$logL(X[(j-l+1):j,]))
+  }
+  plot(llks, type='o', main=k)
+  LLKS.ng.2 <- rbind(LLKS.ng.2, llks)
+  llk.train <- llks[1]
+  cat('llk =', llk.train, '\n')
+  cat('\n')
+}
+
+fc.ng.2 <- numeric(0)
+fc.ng.plus.2 <- numeric(0)
+fc.ng.minus.2 <- numeric(0)
+fc.ng.max.2 <- numeric(0)
+for (i in 1:nrow(LLKS.ng.2)) {
+  # cat('i:', i, )
+  llks <- as.vector(LLKS.ng.2[i,])
+  llk.train <- llks[1]
+  k.opt <- which.min(abs(llks[2:l] - llk.train))
+  fc.ng.2 <- c(fc.ng.2,
+               X[offset+i,1] + (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]))
+  llk.diff.sign <- sign(llks[k.opt+1] - llk.train)
+  fc.ng.plus.2 <- c(fc.ng.plus.2,
+                    X[offset+i,1] + (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]) * llk.diff.sign)
+  fc.ng.minus.2 <- c(fc.ng.minus.2,
+                    X[offset+i,1] - (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]) * llk.diff.sign)
+  k.max <- which.max(llks[2:l])
+  fc.ng.max.2 <- c(fc.ng.max.2,
+                   X[offset+i,1] + (X[offset+i-k.max,4] - X[offset+i-k.max,1]))
+}
+```
+
+```{r}
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.2, col='blue', type='o', ylim=ylim, main='fc.ng.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.plus.2, col='blue', type='o', ylim=ylim, main='fc.ng.plus.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+# w.10 <- 6.51
+# h.10 <- 4.04
+# w.12 <- w.10*1.2
+# h.12 <- h.10*1.2
+# cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/fc_ng_plus_2.ps",
+#          width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(4,4,0,0.3)+0.1)  # bottom, left, top, right
+# plot(X.test[,4], type='o', ylim=ylim,  cex=0.7,
+#      xlab='Дни торговли', ylab='Цена')
+# par(new=TRUE)
+# plot(fc.ng.plus.2, col='blue', type='o', ylim=ylim, pch=16, lty='dashed',  cex=0.7,
+#      xlab='', ylab='', axes=FALSE)
+# legend("topright",
+#        legend = c('Настоящая цена', 'Прогноз'),
+#        col = c('black', 'blue'),
+#        lty = c('solid', 'dashed'))
+# par(mar=mar.old)
+# dev.off()
+
+# w.10 <- 6.51
+# h.10 <- 4.04
+# w.12 <- w.10*1.2
+# h.12 <- h.10*1.2
+# cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/fc_ng_plus_2_closeup.ps",
+#          width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(4,4,0,0.3)+0.1)  # bottom, left, top, right
+# plot(X.test[1:45,4], type='o', ylim=ylim,  cex=1,
+#      xlab='Дни торговли', ylab='Цена')
+# par(new=TRUE)
+# plot(fc.ng.plus.2[1:45], col='blue', type='o', ylim=ylim, pch=16, lty='dashed',  cex=1,
+#      xlab='', ylab='', axes=FALSE)
+# par(new=TRUE)
+# plot(X.test[1:45,1], type='p', pch='=', ylim=ylim, col='red',
+#      xlab='', ylab='', axes=FALSE)
+# legend("bottomleft",
+#        legend = c('Настоящая цена закрытия', 'Прогноз цены закрытия', 'Настоящая цена открытия'),
+#        col = c('black', 'blue', 'red'),
+#        pch = c(1, 16, 61))
+# par(mar=mar.old)
+# dev.off()
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.minus.2, col='blue', type='o', ylim=ylim, main='fc.ng.minus.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.max.2, col='blue', type='o', ylim=ylim, main='fc.ng.max.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+```
+
+```{r}
+mape.ng.2 <- mape(X.test, fc.ng.2)
+mape.ng.minus.2 <- mape(X.test, fc.ng.minus.2)
+mape.ng.plus.2 <- mape(X.test, fc.ng.plus.2)
+mape.ng.max.2 <- mape(X.test, fc.ng.max.2)
+mape.open <- mape(X.test, X.test[,1])
+mape.ng.2
+mape.ng.minus.2
+mape.ng.plus.2
+mape.open
+
+# caps <- trade.sim(X.test, fc.ng.plus.2)
+plot(trade.sim(X.test, fc.ng.2, 10000), type='o', col='blue')
+plot(trade.sim(X.test, fc.ng.minus.2, 10000), type='o', col='blue')
+plot(trade.sim(X.test, fc.ng.plus.2, 10000), type='o', col='blue')
+abline(h=10000, col='red')
+plot(trade.sim(X.test, c(X.test[1,1], X.test[1:(nrow(X.test)-1),1]), 10000), type='o', col='blue')
+plot(trade.sim(X.test, rep(11000, nrow(X.test)), 10000), type='o', col='blue')
+plot(trade.sim(X.test, rep(0, nrow(X.test)), 10000), type='o', col='blue')
+
+w.10 <- 6.51
+h.10 <- 4.04
+w.12 <- w.10*1.2
+h.12 <- h.10*1.2
+cairo_ps(file="~/Documents/СПбГУ/Диплом/pic/sim_trade_fc_ng_plus_2.ps",
+         width=w.12, height=h.12, pointsize=12)
+mar.old <- par()$mar
+par(mar=c(4,4,0,0)+0.1)  # bottom, left, top, right
+plot(trade.sim(X.test, fc.ng.plus.2, 10000), type='o', col='blue', cex=0.7,
+     lty='dashed', pch=16,
+     xlab='Дни торговли', ylab='Капитал')
+abline(h=10000, col='red')
+par(mar=mar.old)
+dev.off()
+```
+
+## nguyen + gupta
+
+```{r}
+m <- 2
+set.seed(1)
+hmm.ng.gpt.2 <- MNormHmm(m, X.return.train, r=2)
+hmm.ng.gpt.2$fit(X.return.train)
+
+LLKS.ng.gpt.2 <- c()
+
+for (k in offset:(nrow(X)-1)) {
+  cat('k:', k, '\n')
+  X.return.train <- X.return[(k-l+1):k,]
+  hmm.ng.gpt.2$fit(X.return.train)
+  llks <- numeric(0)
+  for (j in (k:(k-l+1))) {
+    llks <- c(llks, hmm.ng.gpt.2$logL(X.return[(j-l+1):j,]))
+  }
+  plot(llks, type='o', main=k)
+  LLKS.ng.gpt.2 <- rbind(LLKS.ng.gpt.2, llks)
+  llk.train <- llks[1]
+  cat('llk =', llk.train, '\n')
+  cat('\n')
+}
+
+fc.ng.gpt.2 <- numeric(0)
+fc.ng.gpt.plus.2 <- numeric(0)
+fc.ng.gpt.minus.2 <- numeric(0)
+fc.ng.gpt.max.2 <- numeric(0)
+for (i in 1:nrow(LLKS.ng.gpt.2)) {
+  # cat('i:', i, )
+  llks <- as.vector(LLKS.ng.gpt.2[i,])
+  llk.train <- llks[1]
+  k.opt <- which.min(abs(llks[2:l] - llk.train))
+  # cat('k.opt =', k.opt, '\n')
+  fc.ng.gpt.2 <- c(fc.ng.gpt.2,
+               X[offset+i,1] + (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]))
+  llk.diff.sign <- sign(llks[k.opt+1] - llk.train)
+  # cat('sign =', llk.diff.sign, '\n')
+  fc.ng.gpt.plus.2 <- c(fc.ng.gpt.plus.2,
+                    X[offset+i,1] + (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]) * llk.diff.sign)
+  fc.ng.gpt.minus.2 <- c(fc.ng.gpt.minus.2,
+                     X[offset+i,1] - (X[offset+i-k.opt,4] - X[offset+i-k.opt,1]) * llk.diff.sign)
+  k.max <- which.max(llks[2:l])
+  fc.ng.gpt.max.2 <- c(fc.ng.gpt.max.2,
+                   X[offset+i,1] + (X[offset+i-k.max,4] - X[offset+i-k.max,1]))
+}
+```
+
+```{r}
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.gpt.2, col='blue', type='o', ylim=ylim, main='fc.ng.gpt.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.gpt.plus.2, col='blue', type='o', ylim=ylim, main='fc.ng.gpt.plus.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.gpt.minus.2, col='blue', type='o', ylim=ylim, main='fc.ng.gpt.minus.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+
+ylim <- c(min(X.test[,4]), max(X.test[,4]))
+plot(X.test[,4], type='o', ylim=ylim)
+par(new=TRUE)
+plot(fc.ng.gpt.max.2, col='blue', type='o', ylim=ylim, main='fc.ng.gpt.max.2')
+par(new=TRUE)
+plot(X.test[,1], type='o', pch=0, ylim=ylim, col='green')
+```
+
+```{r}
+mape.ng.gpt.2 <- mape(X.test, fc.ng.gpt.2)
+mape.ng.gpt.minus.2 <- mape(X.test, fc.ng.gpt.minus.2)
+mape.ng.gpt.plus.2 <- mape(X.test, fc.ng.gpt.plus.2)
+mape.ng.gpt.max.2 <- mape(X.test, fc.ng.gpt.max.2)
+mape.open <- mape(X.test, X.test[,1])
+mape.ng.gpt.2
+mape.ng.gpt.minus.2
+mape.ng.gpt.plus.2
+mape.open
+
+plot(trade.sim(X.test, fc.ng.gpt.2, 10000), type='o', col='blue')
+plot(trade.sim(X.test, fc.ng.gpt.minus.2, 10000), type='o', col='blue')
+abline(h=10000, col='red')
+plot(trade.sim(X.test, fc.ng.gpt.plus.2, 10000), type='o', col='blue')
+plot(trade.sim(X.test, c(X.test[1,1], X.test[1:(nrow(X.test)-1),1]), 10000), type='o', col='blue')
+```

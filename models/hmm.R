@@ -30,13 +30,13 @@ Hmm <- setRefClass("Hmm",
       A <<- A
       priors <<- priors
     },
-    initialize = function(m, xx, A, priors, ...) {
+    initialize = function(m, X, A, priors, ...) {
       if (missing(A) && missing(priors)) {
         init.from.data(m, ...)
-      } else if (missing(m) && missing(xx)) {
+      } else if (missing(m) && missing(X)) {
         init.from.params(A, priors)
       } else {
-        stop("Either m, xx or A, priors should be given as arguments.")
+        stop("Either m, X or A, priors should be given as arguments.")
       }
     },
     show = function() {
@@ -45,7 +45,7 @@ Hmm <- setRefClass("Hmm",
       cat("\npriors:\n")
       methods::show(round(priors, 2))
       cat("\npdf.params:\n")
-      methods::show(lapply(pdf.params, function(x) round(x, 2)))
+      methods::show(rapply(pdf.params, function(x) round(x, 2), how='list'))
     },
     getM = function() {
       nrow(A)
@@ -73,16 +73,39 @@ Hmm <- setRefClass("Hmm",
       }
       priors <<- priors / sum(priors)
     },
-    alphaNorm = function(xx, compute.L = FALSE) {
-      T <- length(xx)
-      alpha <- do.call(pdf, c(xx[1], pdf.params)) * priors
+    evalPdfScalar = function(x) {
+      do.call(pdf, c(x, pdf.params))
+    },
+    evalPdfVect = function(xx) {
+      par.zip <- c(do.call(rbind, pdf.params))
+      m <- getM()
+      out <- numeric(m)
+      n.par <- length(pdf.params)
+      for (j in 1:m) {
+        par.cur <- par.zip[((j-1)*n.par+1):(j*n.par)]
+        out[j] <- do.call(pdf, c(list(x=xx), par.cur))
+      }
+      out
+    },
+    alphaNorm = function(X, compute.L = FALSE) {
+      if (is.vector(X)) {
+        T <- length(X)
+        alpha <- evalPdfScalar(X[1]) * priors
+      } else { # matrix
+        T <- nrow(X)
+        alpha <- evalPdfVect(X[1,]) * priors
+      }
       if (compute.L) {
         L.log <- log(sum(alpha))
       }
       alpha.norm <- alpha / sum(alpha)
       if (T > 1) {
         for (t in 2:T) {
-          bb.t <- do.call(pdf, c(xx[t], pdf.params))
+          if (is.vector(X)) {
+            bb.t <- evalPdfScalar(X[t])
+          } else {
+            bb.t <- evalPdfVect(X[t,])
+          }
           z <- alpha.norm %*% A * bb.t
           z.sum <- sum(z)
           if (compute.L) {
@@ -97,12 +120,12 @@ Hmm <- setRefClass("Hmm",
         return(alpha.norm)
       }
     },
-    logL = function(xx) {
-      alphaNorm(xx, compute.L = TRUE)
+    logL = function(X) {
+      alphaNorm(X, compute.L = TRUE)
     },
-    mLogL = function(par.wrk, xx) {
+    mLogL = function(par.wrk, X) {
       setWrkParams(par.wrk)
-      mllk <- -logL(xx)
+      mllk <- -logL(X)
       if (!is.finite(mllk)) {
         cat('Oops! mllk is not finite.\n')
         # FIXME: NaNs produced
@@ -113,9 +136,9 @@ Hmm <- setRefClass("Hmm",
       }
       return(mllk)
     },
-    fit = function(xx, iterlim=1000, method='nlm', ...) {
+    fit = function(X, iterlim=1000, method='nlm', ...) {
       if (method == 'nlm') {
-        nlm.out <- nlm(.self$mLogL, getWrkParams(), xx, iterlim=iterlim, ...)
+        nlm.out <- nlm(.self$mLogL, getWrkParams(), X, iterlim=iterlim, ...)
         setWrkParams(nlm.out$estimate)
         n.iter <<- nlm.out$iterations
         return(nlm.out)
@@ -135,7 +158,7 @@ Hmm <- setRefClass("Hmm",
         ### /HACK
         nlm.out <- mle2(mLogL,
                         start=par.init,
-                        data=list(xx=xx),
+                        data=list(X=X),
                         control=list(maxit=iterlim)) # iterlim!
         # nlm.out <- mle2(.self$mLogL,
         #                 vecpar=TRUE,
@@ -174,6 +197,12 @@ Hmm <- setRefClass("Hmm",
         # return(nlm.out)
       }
     },
+    aic = function(X) {
+      -2 * logL(X) + 2*getDf()
+    },
+    bic = function(X) {
+      -2 * logL(X) + getDf() * log(if (is.vector(X)) length(X) else nrow(X))
+    },
     walkChain = function(T) {
       components <- 1:getM()
       state <- numeric(T)
@@ -189,11 +218,17 @@ Hmm <- setRefClass("Hmm",
                                function(params) params[state],
                                how='list')))
     },
-    forecastDist = function(xx, x.probes, h.max) {
-      F <- matrix(0, h.max, length(x.probes))
-      cc <- alphaNorm(xx, compute.L = FALSE)
-      # B.probe <- t(outer(x.probes, pdf.params$lambda, pdf))  # 4 times faster
-      B.probe <- sapply(x.probes, function(x) do.call(pdf, c(x, pdf.params)))
+    forecastDist = function(X, x.probes, h.max) {
+      if (is.vector(x.probes)) {
+        n <- length(x.probes)
+        # B.probe <- t(outer(x.probes, pdf.params$lambda, pdf))  # 4 times faster
+        B.probe <- sapply(x.probes, evalPdfScalar)
+      } else {
+        n <- nrow(x.probes)
+        B.probe <- apply(x.probes, 1, evalPdfVect)
+      }
+      F <- matrix(0, h.max, n)
+      cc <- alphaNorm(X, compute.L = FALSE)
       for (h in 1:h.max) {
         cc <- cc %*% A
         F[h,] <- cc %*% B.probe
@@ -202,20 +237,23 @@ Hmm <- setRefClass("Hmm",
       # FIXME: is normalization necessary? Works fine w/o it in the case of PoisHmm
       return(F / rowSums(F))
     },
-    forecast = function(xx, x.probes, h.max, method='mode') {
-      T <- length(xx)
-      F <- forecastDist(xx, x.probes, h.max)
+    forecast = function(X, x.probes, h.max, method='mode') {
+      T <- if (is.vector(X)) length(X) else nrow(X)
+      F <- forecastDist(X, x.probes, h.max)
+      fc.idcs <- numeric(h.max)
       if (method == 'mode') {
         fc.idcs <- apply(F, 1, which.max)
       } else if (method == 'mean') {
-        fc.idcs <- as.numeric(F %*% x.probes)
-        # FIXME: rewrite loop
-        for (h in 1:length(fc.idcs)) {
-          fc.idcs[h] <- which.min(abs(x.probes - fc.idcs[h]))
+        if (is.vector(x.probes)) {
+          fc.idcs <- as.numeric(F %*% x.probes)
+          for (h in 1:length(fc.idcs)) {
+            fc.idcs[h] <- which.min(abs(x.probes - fc.idcs[h]))
+          }
+        } else {
+          # FIXME: implement
+          stop("Not Implemented")
         }
       } else if (method == 'median') {
-        # FIXME: rewrite loop
-        fc.idcs <- numeric(h.max)
         for (h in 1:length(fc.idcs)) {
           fc.idcs[h] <- which.min(abs(cumsum(F[h,]) - 0.5))
         }
@@ -223,7 +261,8 @@ Hmm <- setRefClass("Hmm",
         stop(paste('Unknown method', method))
       }
       fc <- list()
-      fc$'forecast' <- x.probes[fc.idcs]
+      fc$'forecast' <- if (is.vector(x.probes)) x.probes[fc.idcs] else
+                                                fc.idcs
       conf.levels <- c(0.8, 0.95)
       fc$'level' <- conf.levels * 100
       for (b in c('lower', 'upper')) {
@@ -234,40 +273,45 @@ Hmm <- setRefClass("Hmm",
         conf.level <- conf.levels[lvl.idx]
         ui <- numeric(h.max)
         li <- numeric(h.max)
-        # FIXME: rewrite loop
         for (h in 1:h.max) {
           # print(h)
           pivot <- fc.idcs[h]
           accum <- F[h, pivot]
           ui[h] <- pivot
           li[h] <- pivot
-          #FIXME: broken logic: check before adding
           while ((li[h] > 1) || (ui[h] < length(F[h,]))) {
-            if (li[h] > 2)  {
-              if ((F[h, li[h] - 1] + accum) > conf.level) {
-                break
-              }
+            if (li[h] > 1)  {
               li[h] <- li[h] - 1
-              accum <- accum + F[h, li[h]]
+              if ((F[h, li[h]] + accum) > conf.level) {
+                break
+              } else {
+                accum <- accum + F[h, li[h]]
+              }
             }
-            if (ui[h] < length(F[h,])-1) {
-              if ((F[1, ui[h] + 1] + accum) > conf.level) {
+            if (ui[h] < length(F[h,])) {
+              ui[h] <- ui[h] + 1
+              if ((F[h, ui[h]] + accum) > conf.level) {
                 break
               }
-              ui[h] <- ui[h] + 1
               accum <- accum + F[h, ui[h]]
             }
             # print(c(li[h], ui[h], accum))
           }
           # print(paste('lower', h, conf.level, '<-', x.probes[li[h]]))
           # print(paste('upper', h, conf.level, '<-', x.probes[ui[h]]))
-          fc$lower[h, lvl.idx] <- x.probes[li[h]]
-          fc$upper[h, lvl.idx] <- x.probes[ui[h]]
+          fc$lower[h, lvl.idx] <- if (is.vector(x.probes)) x.probes[li[h]] else
+                                                           li[h]
+          fc$upper[h, lvl.idx] <- if (is.vector(x.probes)) x.probes[ui[h]] else
+                                                           ui[h]
         }
       }
       return(fc)
     },
     betaNorm = function(xx) {
+      if (!is.vector(xx)) {
+        # TODO: implement
+        stop("Not Implemented")
+      }
       # dim(t(t(v))) = 3 1, so R works with column-vector by default
       m <- getM()
       beta.T <- rep(1/m, m)
@@ -281,6 +325,10 @@ Hmm <- setRefClass("Hmm",
       return(t(beta.T))
     },
     interpolateDist = function(xx, x.probes, t.probes) {
+      if (!is.vector(xx)) {
+        # TODO: implement
+        stop("Not Implemented")
+      }
       m <- getM()
       T <- length(xx)
       # browser()
@@ -291,7 +339,7 @@ Hmm <- setRefClass("Hmm",
           stop(paste('Invalid time', t.0))
         }
         beta.norm <- betaNorm(xx[t.0:T])
-        # B.xx is a l x m matrix, l = |x.probes|
+        # B.xx is an l x m matrix, l = |x.probes|
         B.xx <- t(sapply(x.probes, function(x) do.call(pdf, c(x, pdf.params))))
         if (t.0 == 1) {
           zz <- t(priors)
@@ -307,6 +355,10 @@ Hmm <- setRefClass("Hmm",
       return(D)
     },
     interpolate = function(xx, x.probes, t.probes, method='mode') {
+      if (!is.vector(xx)) {
+        # TODO: implement
+        stop("Not Implemented")
+      }
       D <- interpolateDist(xx, x.probes, t.probes)
       if (method == 'mode') {
         ii <- x.probes[apply(D, 1, which.max)]
@@ -320,12 +372,6 @@ Hmm <- setRefClass("Hmm",
         stop(paste('Unknown method', method))
       }
       return(ii)
-    },
-    aic = function(xx) {
-      -2 * logL(xx) + 2*getDf()
-    },
-    bic = function(xx) {
-      -2 * logL(xx) + getDf() * log(length(xx))
     }
   )
 )

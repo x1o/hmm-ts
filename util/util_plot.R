@@ -44,6 +44,8 @@ plotForecast <- function(fc, xx, h.max, xx.true=numeric(0), ylim, ...) {
 }
 
 plotForecastDist <- function(D, xx, x.probes, h.plot=c(), xx.true=c()) {
+  # FIXME: what if x.probes is a vector?
+  # FIXME: xx
   plot.idcs <- 1:nrow(D)
   if (length(h.plot) != 0) {
     plot.idcs <- h.plot

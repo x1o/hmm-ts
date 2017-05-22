@@ -1,0 +1,194 @@
+---
+title: "E.coli"
+author: "Dmitry Zotikov"
+date: "April 11, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source('../models/categ_hmm.R')
+```
+
+
+```{r}
+qq <- c('A', 'C', 'G', 'T')
+xx <- 'GTAAGTATTTTTCAGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGCTTCTGAACTGGTTACCTGCCGTGAGTAAATTAAAATTTTATTGACTTAGGTCACTAAATACTTTAACCAATATAGGCATAGCGCACAGACAGATAAAAATTACAGAGTACACAACATCCATGAAACGCATTAGCACCACCATTACCACCACCATCACCATTACCACAGGTAACGGTGCGGGCTGACGCGTACAGGAAACACAGAAAAAAGCCCGCACCTGACAGTGCGGGCTTTTTTTTCGACCAAAGGTAACGAGGTAACAACCATGCGAGTGTTGAAGTTCGGCGGTACATCAGTGGCAAATGCAGAACGTTTTCTGCGTGTTGCCGATATTCTGGAAAGCAATGCCAGGCAGGGGCAGGTGGCCACCGTCCTCTCTGCCCCCGCCAAAATCACCAACCACCTGGTGGCGATGATTGAAAAAACCATTAGCGGCCAGGATGCTTTACCCAATATCAGCGATGCCGAACGTATTTTTGCCGAACTTTTGACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGCTGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGTTGGGGCAGTGCCCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCGAGAAAATGTCGATCGCCATTATGGCCGGCGTGTTAGAAGCGCGTGGTCACAACGTTACCGTTATCGATCCGGTCGAAAAACTGCTGGCAGTGGGGCATTACCTCGAATCTACCGTCGATATTGCTGAGTCCACCCGCCGTATTGCGGCAAGCCGCATTCCGGCTGATCACATGGTGTTGATGGCAGGTTTCACCGCCGGTAATGAAAAAGGCGAACTGGTGGTACTTGGACGCAACGGTTCCGACTACTCCGCGGCGGTGCTGGCTGCCTGTTTACGCGCCGATTGTTGCGAG'
+xx.num <- str.to.idcs(xx, qq)
+acf(xx.num, length(xx.num))
+hist(xx.num, breaks=0:4)
+```
+
+```{r}
+source('../util/modsel.R')
+set.seed(1)
+selectModelIc(CategHmm, xx, 4, TRUE)
+```
+
+```{r}
+set.seed(1)
+hmm <- CategHmm(3, xx)
+hmm$fit(xx)
+colnames(hmm$pdf.params$prob)  <- hmm$qq
+barplot(hmm$pdf.params$prob)
+```
+
+## Восстановление наблюдений (интерполяция)
+
+Point probability of $\xi_{t_0} = 3$ at $t_0 = 4$ (given a sample with $x_{t_0}$ missing).
+
+```{r}
+hmm$interpolateDist(xx, 3, 4)
+```
+
+Distribution of $\xi_{t_0}, t_0 = 4$ (with $x_{t_0}$ missing).
+
+```{r}
+x.probes <- 1:4
+dd <- hmm$interpolateDist(xx, x.probes, 5)
+barplot(dd)
+sum(dd)
+```
+
+Distribution of $\xi_{t_0}$ for $t_0 \in \{1, 3, \dots, 11 \}$ (with $x_{t_0}$ missing).
+
+```{r}
+D <- hmm$interpolateDist(xx, x.probes, seq(1,12,by=2))
+matplot(t(D), type='b', pch=1:4)
+```
+
+Distribution of $\xi_{t_0}$ for $t_0 \in \{1, \dots, 16 \}$ (with $x_{t_0}$ missing).
+
+```{r, fig.height=9, fig.width=9}
+D <- hmm$interpolateDist(str.to.idcs(xx, qq), x.probes, 1:16)
+source('util_plot.R')
+plotForecastDist(D, str.to.idcs(xx, qq), x.probes, 1:16, xx.true=str.to.idcs(xx, qq))
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16.pdf",
+#     width=6.06, height=4.06, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+# par(mar=mar.old)
+# dev.off()
+
+# pdf(file="~/Documents/СПбГУ/Диплом/pic/interp-eq-16-th.pdf",
+#     width=w.12, height=h.12, pointsize=12)
+# mar.old <- par()$mar
+# par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right
+# plotForecastDist(D, xx, x.probes, 1:16, xx.true=xx)
+# par(mar=mar.old)
+# dev.off()
+```
+
+```{r}
+source('../util/util_test.R')
+res <- testIntepolation(hmm, str.to.idcs(xx, qq), x.probes, t.probes)
+```
+
+Не всегда истинное значение совпадало с одной из характеристик положения; тем не менее, было оно довольно "близко".  Предположительно, при уменьшении алфавита, точность возрастет.
+
+```{r}
+head(res)
+```
+
+Точное угадывание хотя бы одной характеристикой:
+
+```{r}
+correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0))
+correct
+```
+
+ # точных угадываний:
+
+```{r}
+nrow(correct)
+```
+
+% точных угдаываний:
+
+```{r}
+nrow(correct) / length(xx)
+```
+
+% точных угдаываний по каждой характеристике:
+
+```{r}
+for (i in 1:3) {
+  cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / nchar(xx), '\n')
+}
+```
+
+<!-- Распределение наблюдений на 2-м шаге (при отсутствующем наблюдений на втором шаге в выборке): -->
+
+<!-- ```{r} -->
+<!-- dd <- hmm$interpolateDist(xx, hmm$qq, 2) -->
+<!-- colnames(dd) <- hmm$qq -->
+<!-- barplot(dd) -->
+<!-- ``` -->
+
+<!-- Распределения с шага 16 по 31.  Видно, что угадывания не очень-то хороши -->
+
+<!-- ```{r, fig.height=9, fig.width=9} -->
+<!-- source('util_plot.R') -->
+<!-- x.probes <- hmm$qq -->
+<!-- D <- hmm$interpolateDist(xx, x.probes, 1:100) -->
+<!-- # FIXME: only numeric data allowed -->
+<!-- xx.num <- str.to.idcs(substring(xx, 1, 100), hmm$qq) -->
+<!-- x.probes.num <- 1:33 -->
+<!-- t.probes <- 16:31 -->
+<!-- plotForecastDist(D, xx.num, x.probes.num, t.probes, xx.num) -->
+
+<!-- # pdf(file="~/Documents/СПбГУ/Диплом/pic/martin-interp-16-32.pdf", -->
+<!-- #     width=6.06, height=4.06, pointsize=12) -->
+<!-- # mar.old <- par()$mar -->
+<!-- # par(mar=c(2,2,0,0)+0.1)  # bottom, left, top, right -->
+<!-- # plotForecastDist(D, xx.1k.num, x.probes.num, t.probes, xx.1k.num) -->
+<!-- # par(mar=mar.old) -->
+<!-- # dev.off() -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- source('util_test.R') -->
+<!-- res <- testIntepolation(hmm, xx.num, x.probes.num, t.probes) -->
+<!-- head(res) -->
+<!-- correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0)) -->
+<!-- correct -->
+<!-- nrow(correct) -->
+<!-- nrow(correct) / length(xx.1k.num) -->
+<!-- for (i in 1:3) { -->
+<!--   cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx.1k.num), '\n') -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- Ну, хорошо.  А что если просто HMM плохо описывают текст на естественном языке?  Пусть у нас есть текст, хорошо соответствующий модели -- т.е. такой, который мы сами сгенерировали этой моделью. -->
+
+<!-- ```{r} -->
+<!-- set.seed(1) -->
+<!-- xx.gen <- hmm.4.1k$genSample(1000) -->
+<!-- xx.gen -->
+<!-- ``` -->
+
+<!-- Для контраста любопытно посмотреть текст, сгенерированный по модам распределений: -->
+
+<!-- ```{r} -->
+<!-- D <- hmm.4.1k$interpolateDist(xx.1k, x.probes, 1:500) -->
+<!-- idcs.to.str(apply(D, 1, which.max), x.probes) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- xx.gen.num <- str.to.idcs(xx.gen, x.probes) -->
+<!-- res <- testIntepolation(hmm.4.1k, xx.gen.num, x.probes.num, 1:100) -->
+<!-- head(res) -->
+<!-- correct <- subset(res, (res[,'d.mode'] == 0) | (res[,'d.mean'] == 0) | (res[,'d.median'] == 0)) -->
+<!-- correct -->
+<!-- nrow(correct) -->
+<!-- nrow(correct) / length(xx.gen.num) -->
+<!-- for (i in 1:3) { -->
+<!--   cat(colnames(res)[1+i], ':', nrow(subset(res, res[, 4+i] == 0)) / length(xx.gen.num), '\n') -->
+<!-- } -->
+<!-- ``` -->
+
